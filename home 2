@@ -1,1 +1,399 @@
-fmfkd
+"use client"
+
+import { useMemo, useState } from "react"
+import { useApp, EventType } from "@/lib/app-context"
+import { BottomNav } from "@/components/navigation/bottom-nav"
+import { TopHeader } from "@/components/navigation/top-header"
+import Image from "next/image"
+import {
+  Heart,
+  Bookmark,
+  Calendar,
+  MapPin,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  MessageCircle,
+  User,
+  SlidersHorizontal,
+} from "lucide-react"
+const stories = [
+  { id: 1, name: "Victoria", image: "/placeholder.svg" },
+  { id: 2, name: "Alaín", image: "/placeholder.svg" },
+  { id: 3, name: "Adonte", image: "/placeholder.svg" },
+  { id: 4, name: "Lindsay", image: "/placeholder.svg" },
+]
+type FilterKey =
+  | "public"
+  | "private"
+  | "free"
+  | "paid"
+  | "offCampus"
+  | "workshop"
+  | "individual"
+  | "dance"
+
+const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
+  { key: "public", label: "🌐 Public" },
+  { key: "private", label: "🔒 Private" },
+  { key: "free", label: "🎉 Free" },
+  { key: "paid", label: "💰 Paid" },
+  { key: "offCampus", label: "📍 Off Campus" },
+  { key: "workshop", label: "🎓 Workshop" },
+  { key: "individual", label: "👤 Individual" },
+  { key: "dance", label: "💃 Dance" },
+]
+function formatTime12h(time: string) {
+  const [h, m] = time.split(":").map(Number)
+  const period = h >= 12 ? "PM" : "AM"
+  const hour = h % 12 || 12
+  return `${hour}:${m.toString().padStart(2, "0")} ${period}`
+}
+
+function getDateString(date: Date) {
+  return date.toISOString().split("T")[0]
+}
+function formatDateChip(date: Date) {
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  })
+}
+
+function shortText(text?: string) {
+  const cleaned = (text || "").replace(/\s+/g, " ").trim()
+  if (cleaned.length <= 58) return cleaned
+  return cleaned.slice(0, 58) + "..."
+}
+function getCategoryLabel(event: EventType) {
+  if (event.category === "class") return "Class"
+  if (event.category === "announcement") return "Announcement"
+  return "Event"
+}
+function DateSelector({
+  date,
+  setDate,
+}: {
+  date: Date
+  setDate: (date: Date) => void
+}) {
+  const prev = () => {
+    const d = new Date(date)
+    d.setDate(d.getDate() - 1)
+    setDate(d)
+  }
+
+  const next = () => {
+    const d = new Date(date)
+    d.setDate(d.getDate() + 1)
+    setDate(d)
+  }
+  return (
+    <div className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-2 shrink-0">
+      <button
+        onClick={prev}
+        className="rounded-full p-1 hover:bg-background/40 transition-colors"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+
+      <span className="text-sm font-medium min-w-[88px] text-center">
+        {formatDateChip(date)}
+      </span>
+
+      <button
+        onClick={next}
+        className="rounded-full p-1 hover:bg-background/40 transition-colors"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
+function EventCard({ event }: { event: EventType }) {
+  const { setSelectedEvent, setCurrentScreen, setLastEventSource } = useApp()
+
+  const openEvent = () => {
+    setSelectedEvent(event)
+    setLastEventSource("home")
+    setCurrentScreen("event-detail")
+  }
+
+  return (
+    <div
+      onClick={openEvent}
+      className="overflow-hidden rounded-[26px] border border-white/10 bg-black active:scale-[0.99] transition"
+    >
+      <div className="relative h-[118px]">
+        <Image
+          src={event.image || "/placeholder.svg"}
+          alt={event.title}
+          fill
+          className="object-cover"
+        />
+
+        <span className="absolute left-3 top-3 rounded-full bg-[#ddd1b6] px-3 py-1 text-[10px] font-medium text-[#c89f31]">
+          {getCategoryLabel(event)}
+        </span>
+      </div>
+      <div className="bg-black px-4 py-3">
+        <div className="mb-2 flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2f250d]">
+            <User className="h-3 w-3 text-[#d0a73f]" />
+          </div>
+
+          <span className="text-[12px] text-zinc-400">
+            Organized by{" "}
+            <span className="font-medium text-white">
+              {event.hostName || "Ana Lopez"}
+            </span>
+          </span>
+        </div>
+        <h3 className="text-[16px] font-semibold leading-tight text-white">
+          {event.title}
+        </h3>
+
+        <p className="mt-1 text-[12px] text-zinc-500 leading-5">
+          {shortText(event.description)}
+        </p>
+
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+          <span className="flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            {new Date(event.date + "T00:00:00").toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            })}
+          </span>
+          <span className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {event.time ? formatTime12h(event.time) : "10:00 AM"}
+          </span>
+
+          <span className="flex items-center gap-1 truncate max-w-[130px]">
+            <MapPin className="h-3 w-3" />
+            {event.location || "Location"}
+          </span>
+        </div>
+        <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2">
+          <div className="flex items-center gap-4 text-white">
+            <div className="flex items-center gap-1">
+              <Heart className="h-5 w-5 stroke-[1.9]" />
+              <span className="text-[11px]">{event.likes ?? 0}</span>
+            </div>
+
+            <Bookmark className="h-5 w-5 stroke-[1.9]" />
+
+            <div className="flex items-center gap-1">
+              <MessageCircle className="h-5 w-5 stroke-[1.9]" />
+              <span className="text-[11px]">{event.commentsCount ?? 0}</span>
+            </div>
+          </div>
+
+          <span className="text-[13px] font-medium text-[#d0a73f]">
+            View more
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+export function HomeScreen() {
+  const { events, user } = useApp()
+  const [date, setDate] = useState(new Date())
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [selectedFilters, setSelectedFilters] = useState<FilterKey[]>([])
+
+  const today = getDateString(new Date())
+
+  const demoEvents: EventType[] = [
+    {
+      id: "demo-1",
+      title: "Bachata Fundamentals",
+      date: today,
+      time: "18:00",
+      location: "Studio A",
+      image: "/placeholder.svg",
+      description: "Learn bachata basics.",
+      likes: 28,
+      commentsCount: 0,
+      hostName: "Maria",
+      category: "class",
+      visibility: "public",
+      pricing: "free",
+      price: 0,
+      comments: [],
+      isLiked: false,
+      isSaved: false,
+      activityTypes: ["dance"],
+    },
+    {
+      id: "demo-2",
+      title: "Advanced Salsa",
+      date: today,
+      time: "19:30",
+      location: "Studio B",
+      image: "/placeholder.svg",
+      description: "Advanced salsa moves.",
+      likes: 34,
+      commentsCount: 0,
+      hostName: "Diego",
+      category: "class",
+      visibility: "public",
+      pricing: "paid",
+      price: 20,
+      comments: [],
+      isLiked: false,
+      isSaved: false,
+      activityTypes: ["dance", "workshop"],
+    },
+    {
+      id: "demo-3",
+      title: "Latin Festival",
+      date: today,
+      time: "21:00",
+      location: "NYC",
+      image: "/placeholder.svg",
+      description: "Dance festival.",
+      likes: 120,
+      commentsCount: 0,
+      hostName: "Ana",
+      category: "event",
+      visibility: "public",
+      pricing: "paid",
+      price: 25,
+      comments: [],
+      isLiked: false,
+      isSaved: false,
+      activityTypes: ["dance", "off-campus"],
+    },
+  ]
+  const sourceEvents = events.length > 0 ? events : demoEvents
+
+  const toggleFilter = (filter: FilterKey) => {
+    setSelectedFilters((prev) =>
+      prev.includes(filter)
+        ? prev.filter((item) => item !== filter)
+        : [...prev, filter]
+    )
+  }
+
+  const filteredEvents = useMemo(() => {
+    let result = sourceEvents.filter((e) => e.date === getDateString(date))
+
+    if (selectedFilters.length === 0) return result
+
+    return result.filter((event) =>
+      selectedFilters.every((filter) => {
+        switch (filter) {
+          case "public":
+            return event.visibility === "public" || event.isPublic === true
+          case "private":
+            return event.visibility === "private" || event.isPublic === false
+          case "free":
+            return event.pricing === "free" || event.price === 0
+          case "paid":
+            return event.pricing === "paid" || (event.price ?? 0) > 0
+          case "offCampus":
+            return event.activityTypes?.includes("off-campus") || false
+          case "workshop":
+            return event.activityTypes?.includes("workshop") || false
+          case "individual":
+            return event.activityTypes?.includes("individual") || false
+          case "dance":
+            return event.activityTypes?.includes("dance") || false
+          default:
+            return true
+        }
+      })
+    )
+  }, [sourceEvents, date, selectedFilters])
+  return (
+    <div className="flex h-screen flex-col bg-background">
+      <TopHeader title="Home" showProfile />
+
+      <div className="flex-1 overflow-y-auto pb-28">
+        <div className="px-4 pt-3">
+          <div className="flex gap-4 overflow-x-auto pb-3">
+            {stories.map((story) => (
+              <div key={story.id} className="flex min-w-[72px] flex-col items-center">
+                <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-primary">
+                  <Image src={story.image} alt={story.name} width={64} height={64} />
+                </div>
+                <span className="mt-1 text-xs text-muted-foreground">
+                  {story.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="sticky top-0 z-20 bg-background/95 px-4 pb-4 pt-2 backdrop-blur-sm">
+          <p className="text-muted-foreground">
+            
+Hello,{" "}
+<span className="font-semibold text-primary">
+  Mario
+</span>
+          </p>
+
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <button
+              onClick={() => setFiltersOpen((prev) => !prev)}
+              className="flex items-center gap-2 rounded-full border border-border px-3 py-2 text-sm"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filter
+            </button>
+
+            <DateSelector date={date} setDate={setDate} />
+          </div>
+
+          <div
+            className={`grid transition-all duration-300 ease-out ${
+              filtersOpen
+                ? "grid-rows-[1fr] opacity-100 mt-4"
+                : "grid-rows-[0fr] opacity-0 mt-0"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div className="flex flex-wrap gap-2">
+                {FILTER_OPTIONS.map((filter) => {
+                  const active = selectedFilters.includes(filter.key)
+
+                  return (
+                    <button
+                      key={filter.key}
+                      onClick={() => toggleFilter(filter.key)}
+                      className={`rounded-full border px-2.5 py-1.5 text-[11px] font-medium transition-all ${
+                        active
+                          ? "border-primary bg-primary/15 text-primary"
+                          : "border-border bg-card text-foreground"
+                      }`}
+                    >
+                      {filter.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-2 space-y-4 px-4">
+          {filteredEvents.map((event) => (
+            <EventCard key={event.id} event={event} />
+          ))}
+
+          {filteredEvents.length === 0 && (
+            <div className="py-12 text-center text-muted-foreground">
+              No events for this filter/date
+            </div>
+          )}
+        </div>
+      </div>
+
+      <BottomNav />
+    </div>
+  )
+}

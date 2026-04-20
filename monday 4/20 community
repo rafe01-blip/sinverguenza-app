@@ -1,0 +1,1143 @@
+"use client"
+
+import { useMemo, useRef, useState } from "react"
+import { useApp } from "@/lib/app-context"
+import type { SpaceKey, StoryReaction } from "@/lib/app-context"
+import { TopHeader } from "@/components/navigation/top-header"
+import { BottomNav } from "@/components/navigation/bottom-nav"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Heart,
+  MessageCircle,
+  Share2,
+  MoreHorizontal,
+  Image as ImageIcon,
+  Send,
+  X,
+  Instagram,
+  ChevronDown,
+  ChevronUp,
+  Users,
+  Play,
+  BarChart3,
+  UserPlus,
+  UserCheck,
+  ExternalLink,
+  BadgeCheck,
+  Sparkles,
+  MessagesSquare,
+  Flame,
+  Plus,
+  Eye,
+} from "lucide-react"
+import Image from "next/image"
+
+type ComposerType = "post" | "story" | "poll" | "video"
+
+const STORY_REACTIONS: StoryReaction[] = ["❤️", "🔥", "👏", "🕺🏾", "💃", "😎", "🤣"]
+
+function timeAgoFromDate(dateString: string) {
+  const now = Date.now()
+  const then = new Date(dateString).getTime()
+  const diff = Math.max(1, now - then)
+
+  const minutes = Math.floor(diff / (1000 * 60))
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+  if (minutes < 60) return `${minutes}m ago`
+  if (hours < 24) return `${hours}h ago`
+  return `${days}d ago`
+}
+
+function getCreatorBadgeClass(role: string) {
+  switch (role) {
+    case "official":
+      return "bg-primary/20 text-primary"
+    case "instructor":
+      return "bg-emerald-500/20 text-emerald-400"
+    case "host":
+      return "bg-violet-500/20 text-violet-400"
+    default:
+      return "bg-muted text-muted-foreground"
+  }
+}
+
+function getCreatorBadgeText(role: string) {
+  switch (role) {
+    case "official":
+      return "Official"
+    case "instructor":
+      return "Instructor"
+    case "host":
+      return "Host"
+    default:
+      return "Member"
+  }
+}
+function getSpaceLabel(space: SpaceKey) {
+  switch (space) {
+    case "dance":
+      return "Dance"
+    case "workshop":
+      return "Workshop"
+    case "free":
+      return "Free"
+    case "paid":
+      return "Paid"
+    case "public":
+      return "Public"
+    case "private":
+      return "Private"
+    case "off-campus":
+      return "Off Campus"
+    case "individual":
+      return "Individual"
+    case "general":
+      return "General"
+    case "music":
+      return "Music"
+    case "events":
+      return "Events"
+    case "opportunities":
+      return "Opportunities"
+    default:
+      return "Topic"
+  }
+}
+
+function getTopReaction(
+  quickReactions?: Partial<Record<StoryReaction, number>>
+): StoryReaction | null {
+  if (!quickReactions) return null
+
+  let topReaction: StoryReaction | null = null
+  let topCount = 0
+
+  STORY_REACTIONS.forEach((reaction) => {
+    const count = quickReactions[reaction] ?? 0
+    if (count > topCount) {
+      topCount = count
+      topReaction = reaction
+    }
+  })
+
+  return topReaction
+}
+
+function StoryCard({
+  storyId,
+}: {
+  storyId: string
+}) {
+  const {
+    communityStories,
+    creators,
+    openStory,
+    toggleStoryLike,
+    setStoryReaction,
+  } = useApp()
+
+  const story = communityStories.find((item) => item.id === storyId)
+  if (!story) return null
+
+  const creator = creators.find((item) => item.id === story.authorId)
+  if (!creator) return null
+
+  const coverImage = story.slides?.[0]?.image || story.image || creator.coverImage || creator.avatar || "/placeholder.svg"
+  const topReaction = getTopReaction(story.quickReactions)
+  const totalReplies = story.replies?.length ?? 0
+
+  return (
+    <div className="w-[210px] shrink-0 rounded-[24px] border border-white/10 bg-card p-2.5 shadow-[0_14px_28px_rgba(0,0,0,0.22)]">
+      <button
+        onClick={() => openStory(story.id, "community")}
+        className="group block w-full text-left"
+      >
+        <div className="relative h-[250px] overflow-hidden rounded-[20px] border border-primary/20 bg-black">
+          <Image
+            src={coverImage}
+            alt={story.content}
+            fill
+            className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black/10" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,168,76,0.16),transparent_28%)]" />
+
+          <div className="absolute left-3 top-3 right-3 flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="relative h-9 w-9 overflow-hidden rounded-full border border-white/40 bg-muted">
+                <Image
+                  src={creator.avatar || "/placeholder.svg"}
+                  alt={creator.username}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+
+              <div className="min-w-0">
+                <p className="truncate text-[12px] font-semibold text-white">
+                  {creator.displayName || creator.name}
+                </p>
+                <p className="truncate text-[11px] text-white/70">@{creator.username}</p>
+              </div>
+            </div>
+
+            <div className="rounded-full border border-primary/30 bg-black/55 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary backdrop-blur-md">
+              24h
+            </div>
+          </div>
+
+          <div className="absolute inset-x-3 bottom-3">
+            <div className="rounded-[18px] border border-white/10 bg-black/55 p-3 backdrop-blur-md">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="rounded-full border border-primary/25 bg-primary/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+                  {story.type === "video" ? "Video" : "Story"}
+                </span>
+
+                <span className="text-[11px] text-white/70">
+                  {timeAgoFromDate(story.createdAt)}
+                </span>
+              </div>
+
+              <p className="line-clamp-2 text-sm font-medium leading-6 text-white">
+                {story.content}
+              </p>
+            </div>
+          </div>
+        </div>
+      </button>
+
+      <div className="px-1 pt-3">
+        <div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <Eye className="h-3.5 w-3.5" />
+            {story.seenByMe ? "Seen" : "Unseen"}
+          </span>
+
+          <span>
+            {story.likesCount ?? 0} likes · {totalReplies} replies
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={() => toggleStoryLike(story.id)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors ${
+              story.isLiked
+                ? "border-red-500/30 bg-red-500/12 text-red-400"
+                : "border-white/10 bg-white/[0.04] text-zinc-300"
+            }`}
+          >
+            <Heart className={`h-4 w-4 ${story.isLiked ? "fill-red-500" : ""}`} />
+            Like
+          </button>
+
+          <div className="flex items-center gap-1">
+            {STORY_REACTIONS.slice(0, 3).map((reaction) => (
+              <button
+                key={reaction}
+                onClick={() => setStoryReaction(story.id, reaction)}
+                className={`flex h-8 w-8 items-center justify-center rounded-full border text-sm transition-colors ${
+                  story.myReaction === reaction
+                    ? "border-primary bg-primary/15"
+                    : "border-white/10 bg-white/[0.04]"
+                }`}
+              >
+                {reaction}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {(topReaction || creator.instagramUrl) && (
+          <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+            <span>{topReaction ? `Top reaction ${topReaction}` : "Community story"}</span>
+
+            {creator.instagramUrl && (
+              <a
+                href={creator.instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <Instagram className="h-3.5 w-3.5" />
+                IG
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function CommunityScreen() {
+  const {
+    user,
+    creators,
+    communityPosts,
+    createCommunityPost,
+    toggleCommunityLike,
+    addCommunityComment,
+    addCommunityReply,
+    voteOnPoll,
+    openCreatorProfile,
+    toggleFollow,
+    getTopCreators,
+    getStoriesForSource,
+    spaces,
+    openSpace,
+  } = useApp()
+  const [newPostContent, setNewPostContent] = useState("")
+  const [newPostImage, setNewPostImage] = useState<string | null>(null)
+  const [instagramUrl, setInstagramUrl] = useState("")
+  const [showComposer, setShowComposer] = useState(false)
+  const [composerType, setComposerType] = useState<ComposerType>("post")
+  const [expandedComments, setExpandedComments] = useState<string[]>([])
+  const [commentText, setCommentText] = useState<Record<string, string>>({})
+  const [replyText, setReplyText] = useState<Record<string, string>>({})
+  const [replyingTo, setReplyingTo] = useState<{
+    postId: string
+    commentId: string
+  } | null>(null)
+  const [pollOption1, setPollOption1] = useState("")
+  const [pollOption2, setPollOption2] = useState("")
+  const [selectedSpaceForPost, setSelectedSpaceForPost] = useState<SpaceKey | null>(null)
+  const [showCreators, setShowCreators] = useState(true)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const topCreators = useMemo(() => getTopCreators().slice(0, 5), [getTopCreators])
+
+  const publicStories = useMemo(() => getStoriesForSource("community"), [getStoriesForSource])
+
+  const visibleFeedPosts = useMemo(() => {
+    return communityPosts.filter((post) => post.type === "post" || post.type === "poll")
+  }, [communityPosts])
+
+  const trendingPosts = useMemo(() => {
+    return [...visibleFeedPosts].sort((a, b) => b.likes - a.likes).slice(0, 3)
+  }, [visibleFeedPosts])
+
+  const resetComposer = () => {
+    setNewPostContent("")
+    setNewPostImage(null)
+    setInstagramUrl("")
+    setComposerType("post")
+    setPollOption1("")
+    setPollOption2("")
+    setSelectedSpaceForPost(null)
+  }
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      setNewPostImage(event.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleCreatePost = () => {
+    const trimmed = newPostContent.trim()
+    if (!trimmed) return
+
+    if (composerType === "poll" && (!pollOption1.trim() || !pollOption2.trim())) return
+    createCommunityPost({
+      content: trimmed,
+      image: newPostImage || undefined,
+      instagramUrl: instagramUrl.trim() || undefined,
+      type: composerType,
+      audience: composerType === "story" || composerType === "video" ? "public" : undefined,
+      pollOptions:
+        composerType === "poll"
+          ? [pollOption1.trim(), pollOption2.trim()].filter(Boolean)
+          : undefined,
+      spaceKey: selectedSpaceForPost,
+    })
+
+    resetComposer()
+    setShowComposer(false)
+  }
+
+  const toggleComments = (postId: string) => {
+    setExpandedComments((prev) =>
+      prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId]
+    )
+  }
+
+  const handleShare = async (text: string, instagramLink?: string) => {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ text })
+        return
+      } catch {}
+    }
+
+    if (instagramLink && typeof window !== "undefined") {
+      window.open(instagramLink, "_blank", "noopener,noreferrer")
+    }
+  }
+
+  return (
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
+      <TopHeader title="Community" showProfile />
+
+      <div className="flex-1 overflow-y-auto pb-24">
+        <div className="space-y-4 border-b border-border p-4">
+          <div className="relative overflow-hidden rounded-3xl border border-primary/15 bg-card p-4">
+            <div className="absolute right-0 top-0 h-28 w-28 rounded-full bg-primary/10 blur-3xl" />
+            <div className="relative z-10">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+                <Sparkles className="h-3.5 w-3.5" />
+                Sin Vergüenza Community
+              </div>
+
+              <h2 className="text-xl font-semibold text-foreground">
+                A premium bridge between people, creators, and real events
+              </h2>
+
+              <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                Share moments, discover creators, join spaces, and connect your profile
+                with the platforms you already use.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowComposer((prev) => !prev)}
+            className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left text-muted-foreground transition-colors hover:bg-muted/40"
+          >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/15">
+              <span className="text-sm font-semibold text-primary">
+                {user?.name?.charAt(0) || "U"}
+              </span>
+            </div>
+
+            <div className="flex-1">
+              <p className="text-sm text-foreground">Share something with the community...</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Post, public story, poll, or video
+              </p>
+            </div>
+
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-black shadow-[0_0_18px_rgba(201,168,76,0.25)]">
+              <Plus className="h-5 w-5" />
+            </div>
+          </button>
+
+          {showComposer && (
+            <div className="rounded-3xl border border-primary/20 bg-card p-4 shadow-[0_0_40px_rgba(201,168,76,0.08)]">
+              <div className="mb-3 flex flex-wrap gap-2">
+                {(["post", "story", "poll", "video"] as ComposerType[]).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setComposerType(type)}
+                    className={`rounded-full border px-3 py-2 text-xs font-medium transition-colors ${
+                      composerType === type
+                        ? "border-primary bg-primary text-black"
+                        : "border-border bg-background text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    {type === "post" && "Post"}
+                    {type === "story" && "Public Story 24h"}
+                    {type === "poll" && "Poll"}
+                    {type === "video" && "Public Video 24h"}
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                value={newPostContent}
+                onChange={(e) =>
+                  setNewPostContent(e.target.value.slice(0, composerType === "post" ? 280 : 180))
+                }
+                placeholder={
+                  composerType === "poll"
+                    ? "Ask the community something..."
+                    : composerType === "story"
+                      ? "Share a public story..."
+                      : composerType === "video"
+                        ? "Add a short video caption..."
+                        : "What's on your mind?"
+                }
+                className="w-full resize-none rounded-2xl border border-border bg-muted/40 p-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
+                rows={3}
+                autoFocus
+              />
+
+              {composerType === "poll" && (
+                <div className="mt-3 grid gap-2">
+                  <Input
+                    value={pollOption1}
+                    onChange={(e) => setPollOption1(e.target.value.slice(0, 60))}
+                    placeholder="Poll option 1"
+                    className="h-10 text-sm"
+                  />
+                  <Input
+                    value={pollOption2}
+                    onChange={(e) => setPollOption2(e.target.value.slice(0, 60))}
+                    placeholder="Poll option 2"
+                    className="h-10 text-sm"
+                  />
+                </div>
+              )}
+
+              <div className="mt-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+                  Space / Topic
+                </p>
+
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  <button
+                    onClick={() => setSelectedSpaceForPost(null)}
+                    className={`shrink-0 rounded-full border px-3 py-2 text-xs font-medium ${
+                      selectedSpaceForPost === null
+                        ? "border-primary bg-primary text-black"
+                        : "border-border bg-background text-foreground"
+                    }`}
+                  >
+                    General Feed
+                  </button>
+
+                  {spaces.map((space) => (
+                    <button
+                      key={space.key}
+                      onClick={() => setSelectedSpaceForPost(space.key)}
+                      className={`shrink-0 rounded-full border px-3 py-2 text-xs font-medium ${
+                        selectedSpaceForPost === space.key
+                          ? "border-primary bg-primary text-black"
+                          : "border-border bg-background text-foreground"
+                      }`}
+                    >
+                      {space.emoji} {space.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {newPostImage && (
+                <div className="relative mt-3">
+                  <img
+                    src={newPostImage}
+                    alt="Preview"
+                    className="h-52 w-full rounded-2xl object-cover"
+                  />
+                  <button
+                    onClick={() => setNewPostImage(null)}
+                    className="absolute right-2 top-2 rounded-full bg-background/85 p-1.5 hover:bg-background"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
+              <div className="mt-3 flex items-center gap-2">
+                <Instagram className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={instagramUrl}
+                  onChange={(e) => setInstagramUrl(e.target.value)}
+                  placeholder="Instagram link (optional)"
+                  className="h-9 flex-1 text-sm"
+                />
+              </div>
+
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+                  >
+                    {composerType === "video" ? (
+                      <Play className="h-5 w-5" />
+                    ) : (
+                      <ImageIcon className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowComposer(false)
+                      resetComposer()
+                    }}
+                  >
+                    Cancel
+                  </Button>
+
+                  <Button
+                    onClick={handleCreatePost}
+                    disabled={!newPostContent.trim()}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    Publish
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {publicStories.length > 0 && (
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <Play className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Global Stories · 24h</h3>
+              </div>
+
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {publicStories.map((story) => (
+                  <StoryCard key={story.id} storyId={story.id} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div className="mb-3 flex items-center gap-2">
+              <MessagesSquare className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Spaces</h3>
+            </div>
+
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {spaces.map((space) => (
+                <button
+                  key={space.key}
+                  onClick={() => openSpace(space.key)}
+                  className="min-w-[190px] shrink-0 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40"
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-2xl">{space.emoji}</div>
+                    {space.isJoined && (
+                      <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+                        Joined
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="font-semibold text-foreground">{space.label}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                    {space.description}
+                  </p>
+
+                  <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <span>{space.membersCount} people</span>
+                    <span>{space.topicsCount} topics</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <button
+              onClick={() => setShowCreators((prev) => !prev)}
+              className="mb-3 flex w-full items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Top Creators</h3>
+              </div>
+
+              {showCreators ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+
+            {showCreators && (
+              <div className="space-y-3">
+                {topCreators.map((creator) => (
+                  <div
+                    key={creator.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3"
+                  >
+                    <button
+                      onClick={() => openCreatorProfile(creator.id)}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    >
+                      <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-muted">
+                        <Image
+                          src={creator.avatar || "/placeholder.svg"}
+                          alt={creator.username}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate font-medium text-foreground">
+                            @{creator.username}
+                          </span>
+
+                          {creator.isVerified && (
+                            <BadgeCheck className="h-4 w-4 shrink-0 text-primary" />
+                          )}
+
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] ${getCreatorBadgeClass(
+                              String(creator.role || "member")
+                            )}`}
+                          >
+                            {getCreatorBadgeText(String(creator.role || "member"))}
+                          </span>
+                        </div>
+
+                        <p className="truncate text-xs text-muted-foreground">
+                          {(creator.followersCount ?? 0).toLocaleString()} followers ·{" "}
+                          {creator.eventsCount ?? 0} events
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => toggleFollow(creator.id)}
+                      className={`shrink-0 rounded-full border px-3 py-2 text-xs font-medium ${
+                        creator.isFollowing
+                          ? "border-border bg-muted text-foreground"
+                          : "border-primary bg-primary text-black"
+                      }`}
+                    >
+                      {creator.isFollowing ? (
+                        <span className="inline-flex items-center gap-1">
+                          <UserCheck className="h-3.5 w-3.5" />
+                          Following
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1">
+                          <UserPlus className="h-3.5 w-3.5" />
+                          Follow
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {trendingPosts.length > 0 && (
+          <div className="px-4 pt-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Flame className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Trending Now</h3>
+            </div>
+
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {trendingPosts.map((post) => {
+                const creator = creators.find((item) => item.id === post.authorId)
+                if (!creator) return null
+
+                return (
+                  <button
+                    key={post.id}
+                    onClick={() => openCreatorProfile(creator.id)}
+                    className="min-w-[240px] shrink-0 rounded-2xl border border-border bg-card p-4 text-left"
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <div className="relative h-8 w-8 overflow-hidden rounded-full bg-muted">
+                        <Image
+                          src={creator.avatar || "/placeholder.svg"}
+                          alt={creator.username}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {creator.displayName || creator.name}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {timeAgoFromDate(post.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="line-clamp-3 text-sm leading-6 text-foreground">
+                      {post.content}
+                    </p>
+
+                    <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>{post.likes} likes</span>
+                      <span>{post.comments.length} comments</span>
+                      {post.spaceKey && <span>{getSpaceLabel(post.spaceKey)}</span>}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="divide-y divide-border pt-2">
+          {visibleFeedPosts.map((post) => {
+            const creator = creators.find((item) => item.id === post.authorId)
+            if (!creator) return null
+
+            return (
+              <article key={post.id} className="p-4">
+                <div className="mb-3 flex items-start justify-between">
+                  <button
+                    onClick={() => openCreatorProfile(creator.id)}
+                    className="flex items-center gap-3 text-left"
+                  >
+                    <div className="relative h-10 w-10 overflow-hidden rounded-full bg-muted">
+                      <Image
+                        src={creator.avatar || "/placeholder.svg"}
+                        alt={creator.username}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-foreground">
+                          {creator.displayName || creator.name}
+                        </span>
+
+                        {creator.isVerified && (
+                          <BadgeCheck className="h-4 w-4 shrink-0 text-primary" />
+                        )}
+
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-xs ${getCreatorBadgeClass(
+                            String(creator.role || "member")
+                          )}`}
+                        >
+                          {getCreatorBadgeText(String(creator.role || "member"))}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span>{timeAgoFromDate(post.createdAt)}</span>
+                        <span>·</span>
+                        <span>@{creator.username}</span>
+                        {creator.instagramUrl && (
+                          <>
+                            <span>·</span>
+                            <span className="inline-flex items-center gap-1">
+                              <Instagram className="h-3 w-3" />
+                              IG
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+
+                  <button className="rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground">
+                    <MoreHorizontal className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {post.spaceKey && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => openSpace(post.spaceKey as SpaceKey)}
+                      className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary"
+                    >
+                      {getSpaceLabel(post.spaceKey as SpaceKey)}
+                    </button>
+
+                    {post.tags?.slice(0, 2).map((tag) => (
+                      <span
+                        key={`${post.id}-${tag}`}
+                        className="rounded-full border border-border px-3 py-1 text-[11px] text-muted-foreground"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <p className="mb-3 leading-7 text-foreground">{post.content}</p>
+
+                {post.type === "poll" && post.pollOptions && (
+                  <div className="mb-3 space-y-2">
+                    {post.pollOptions.map((option) => {
+                      const selected = post.selectedPollOptionId === option.id
+
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => voteOnPoll(post.id, option.id)}
+                          disabled={!!post.selectedPollOptionId}
+                          className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 transition-colors ${
+                            selected
+                              ? "border-primary bg-primary/10"
+                              : "border-border bg-card hover:bg-secondary"
+                          }`}
+                        >
+                          <div className="inline-flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4 text-primary" />
+                            <span className="text-sm text-foreground">{option.text}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {option.votes} votes
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {post.image && (
+                  <div className="relative mb-3 aspect-video overflow-hidden rounded-2xl bg-muted">
+                    <Image src={post.image} alt="Post image" fill className="object-cover" />
+                  </div>
+                )}
+
+                {post.instagramUrl && (
+                  <a
+                    href={post.instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mb-3 inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
+                    <Instagram className="h-4 w-4" />
+                    Open on Instagram
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+
+                <div className="flex items-center gap-6 pt-2">
+                  <button
+                    onClick={() => toggleCommunityLike(post.id)}
+                    className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-red-500"
+                  >
+                    <Heart
+                      className={`h-5 w-5 ${post.isLiked ? "fill-red-500 text-red-500" : ""}`}
+                    />
+                    <span className="text-sm">{post.likes}</span>
+                  </button>
+
+                  <button
+                    onClick={() => toggleComments(post.id)}
+                    className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-primary"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    <span className="text-sm">{post.comments.length}</span>
+                    {post.comments.length > 0 &&
+                      (expandedComments.includes(post.id) ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      ))}
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      handleShare(`${post.content} ${post.instagramUrl || ""}`, post.instagramUrl)
+                    }
+                    className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-primary"
+                  >
+                    <Share2 className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {expandedComments.includes(post.id) && (
+                  <div className="mt-4 space-y-3 border-t border-border pt-4">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20">
+                        <span className="text-xs font-medium text-primary">
+                          {user?.name?.charAt(0) || "U"}
+                        </span>
+                      </div>
+
+                      <Input
+                        value={commentText[post.id] || ""}
+                        onChange={(e) =>
+                          setCommentText((prev) => ({
+                            ...prev,
+                            [post.id]: e.target.value.slice(0, 120),
+                          }))
+                        }
+                        placeholder="Write a comment..."
+                        className="h-9 flex-1 text-sm"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault()
+                            addCommunityComment(post.id, commentText[post.id] || "")
+                            setCommentText((prev) => ({ ...prev, [post.id]: "" }))
+                          }
+                        }}
+                      />
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          addCommunityComment(post.id, commentText[post.id] || "")
+                          setCommentText((prev) => ({ ...prev, [post.id]: "" }))
+                        }}
+                        disabled={!commentText[post.id]?.trim()}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {post.comments.length === 0 ? (
+                      <p className="py-2 text-center text-sm text-muted-foreground">
+                        No comments yet. Be the first to comment!
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {post.comments.slice(-10).map((comment) => (
+                          <div key={comment.id} className="space-y-2">
+                            <div className="flex items-start gap-2">
+                              <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-muted">
+                                <Image
+                                  src={comment.authorAvatar}
+                                  alt={comment.authorName}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+
+                              <div className="flex-1 rounded-2xl bg-muted/50 p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="text-sm font-medium text-foreground">
+                                    {comment.authorName}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {timeAgoFromDate(comment.createdAt)}
+                                  </span>
+                                </div>
+
+                                <p className="mt-1 text-sm text-foreground">{comment.content}</p>
+
+                                <button
+                                  onClick={() =>
+                                    setReplyingTo({ postId: post.id, commentId: comment.id })
+                                  }
+                                  className="mt-2 text-xs text-muted-foreground hover:text-primary"
+                                >
+                                  Reply
+                                </button>
+                              </div>
+                            </div>
+
+                            {replyingTo?.postId === post.id &&
+                              replyingTo?.commentId === comment.id && (
+                                <div className="ml-10 flex items-center gap-2">
+                                  <Input
+                                    value={replyText[comment.id] || ""}
+                                    placeholder={`Reply to ${comment.authorName}...`}
+                                    className="h-8 flex-1 text-sm"
+                                    autoFocus
+                                    onChange={(e) =>
+                                      setReplyText((prev) => ({
+                                        ...prev,
+                                        [comment.id]: e.target.value.slice(0, 90),
+                                      }))
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault()
+                                        addCommunityReply(
+                                          post.id,
+                                          comment.id,
+                                          replyText[comment.id] || ""
+                                        )
+                                        setReplyText((prev) => ({
+                                          ...prev,
+                                          [comment.id]: "",
+                                        }))
+                                        setReplyingTo(null)
+                                      }
+
+                                      if (e.key === "Escape") {
+                                        setReplyingTo(null)
+                                      }
+                                    }}
+                                  />
+
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      addCommunityReply(
+                                        post.id,
+                                        comment.id,
+                                        replyText[comment.id] || ""
+                                      )
+                                      setReplyText((prev) => ({
+                                        ...prev,
+                                        [comment.id]: "",
+                                      }))
+                                      setReplyingTo(null)
+                                    }}
+                                  >
+                                    <Send className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+
+                            {comment.replies.length > 0 && (
+                              <div className="ml-10 space-y-2">
+                                {comment.replies.map((reply) => (
+                                  <div key={reply.id} className="flex items-start gap-2">
+                                    <div className="relative h-6 w-6 shrink-0 overflow-hidden rounded-full bg-muted">
+                                      <Image
+                                        src={reply.authorAvatar}
+                                        alt={reply.authorName}
+                                        fill
+                                        className="object-cover"
+                                      />
+                                    </div>
+
+                                    <div className="flex-1 rounded-2xl bg-muted/30 p-2.5">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <span className="text-xs font-medium text-foreground">
+                                          {reply.authorName}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {timeAgoFromDate(reply.createdAt)}
+                                        </span>
+                                      </div>
+
+                                      <p className="mt-1 text-xs text-foreground">{reply.content}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {post.comments.length >= 10 && (
+                      <p className="text-center text-xs text-muted-foreground">
+                        Showing last 10 comments
+                      </p>
+                    )}
+                  </div>
+                )}
+              </article>
+            )
+          })}
+        </div>
+      </div>
+
+      <BottomNav />
+    </div>
+  )
+}

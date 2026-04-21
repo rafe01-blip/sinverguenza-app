@@ -1,0 +1,284 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Heart,
+  Instagram,
+  MessageCircle,
+  Send,
+  X,
+} from "lucide-react"
+import { useApp, StoryReaction } from "@/lib/app-context"
+
+const GOLD = "#C9A84C"
+
+const STORY_REACTIONS: StoryReaction[] = ["❤️", "🔥", "👏", "🕺🏾", "💃", "😎", "🤣"]
+
+function timeAgoFromDate(dateString: string) {
+  const now = Date.now()
+  const then = new Date(dateString).getTime()
+  const diff = Math.max(1, now - then)
+
+  const minutes = Math.floor(diff / (1000 * 60))
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+  if (minutes < 60) return `${minutes}m`
+  if (hours < 24) return `${hours}h`
+  return `${days}d`
+}
+
+export function StoryViewerScreen() {
+  const {
+    creators,
+    user,
+    selectedStoryId,
+    setSelectedStoryId,
+    setCurrentScreen,
+    storySource,
+    getStoriesForSource,
+    markStorySeen,
+    toggleStoryLike,
+    addStoryReply,
+    setStoryReaction,
+  } = useApp()
+
+  const stories = useMemo(() => {
+    if (!storySource) return []
+    return getStoriesForSource(storySource)
+  }, [getStoriesForSource, storySource])
+
+  const initialIndex = useMemo(() => {
+    if (!selectedStoryId) return 0
+    const index = stories.findIndex((s) => s.id === selectedStoryId)
+    return index >= 0 ? index : 0
+  }, [stories, selectedStoryId])
+
+  const [activeIndex, setActiveIndex] = useState(initialIndex)
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0)
+  const [replyText, setReplyText] = useState("")
+  const [progressKey, setProgressKey] = useState(0)
+
+  useEffect(() => {
+    setActiveIndex(initialIndex)
+    setActiveSlideIndex(0)
+    setProgressKey((p) => p + 1)
+  }, [initialIndex])
+  const story = stories[activeIndex]
+
+  const creator = useMemo(() => {
+    if (!story) return null
+    return creators.find((c) => c.id === story.authorId) || null
+  }, [story, creators])
+
+  const slides = story?.slides ?? []
+  const slide = slides[activeSlideIndex] || slides[0]
+
+  useEffect(() => {
+    if (!story) return
+    markStorySeen(story.id)
+  }, [story])
+
+  useEffect(() => {
+    if (!story) return
+
+    setProgressKey((p) => p + 1)
+
+    const timer = setTimeout(() => {
+      if (activeSlideIndex < slides.length - 1) {
+        setActiveSlideIndex((p) => p + 1)
+        return
+      }
+
+      if (activeIndex < stories.length - 1) {
+        setActiveIndex((p) => p + 1)
+        setActiveSlideIndex(0)
+        return
+      }
+
+      handleClose()
+    }, 6000)
+
+    return () => clearTimeout(timer)
+  }, [activeIndex, activeSlideIndex, slides.length])
+
+  const handleClose = () => {
+    setSelectedStoryId(null)
+    setCurrentScreen(storySource === "home" ? "home" : "community")
+  }
+
+  const prev = () => {
+    if (activeSlideIndex > 0) {
+      setActiveSlideIndex((p) => p - 1)
+      return
+    }
+
+    if (activeIndex > 0) {
+      const prevStory = stories[activeIndex - 1]
+      setActiveIndex((p) => p - 1)
+      setActiveSlideIndex((prevStory?.slides?.length ?? 1) - 1)
+    }
+  }
+
+  const next = () => {
+    if (activeSlideIndex < slides.length - 1) {
+      setActiveSlideIndex((p) => p + 1)
+      return
+    }
+
+    if (activeIndex < stories.length - 1) {
+      setActiveIndex((p) => p + 1)
+      setActiveSlideIndex(0)
+      return
+    }
+
+    handleClose()
+  }
+
+  const openInstagram = () => {
+    const url =
+      story?.instagramUrl ||
+      creator?.instagramUrl ||
+      creator?.socials?.instagram
+
+    if (!url) return
+    window.open(url, "_blank")
+  }
+
+  const image =
+    slide?.image ||
+    story?.image ||
+    creator?.coverImage ||
+    creator?.avatar ||
+    "/placeholder.svg"
+
+  if (!story || !creator || !slide) return null
+  return (
+    <div className="fixed inset-0 z-[100] bg-black">
+
+      {/* IMAGE */}
+      <img src={image} className="absolute inset-0 h-full w-full object-cover" />
+
+      {/* GRADIENT */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80" />
+
+      {/* PROGRESS BAR (premium thin) */}
+      <div className="absolute top-3 left-3 right-3 flex gap-1">
+        {slides.map((s, i) => (
+          <div key={s.id} className="flex-1 h-[2px] bg-white/20 rounded-full overflow-hidden">
+            {i < activeSlideIndex && <div className="h-full bg-white" />}
+            {i === activeSlideIndex && (
+              <div key={progressKey} className="story-progress h-full bg-white" />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* HEADER */}
+      <div className="absolute top-6 left-4 right-4 flex items-center justify-between z-10">
+
+        <div className="flex items-center gap-3">
+          <button onClick={handleClose} className="h-10 w-10 flex items-center justify-center rounded-full bg-black/40">
+            <X className="h-5 w-5 text-white" />
+          </button>
+
+          <div className="h-10 w-10 rounded-full overflow-hidden border border-primary">
+            <img src={creator.avatar || "/placeholder.svg"} className="h-full w-full object-cover"/>
+          </div>
+
+          <div>
+            <p className="text-white text-sm font-semibold">
+              {creator.displayName || creator.name}
+            </p>
+            <p className="text-zinc-400 text-xs">
+              {timeAgoFromDate(story.createdAt)}
+            </p>
+          </div>
+        </div>
+
+        <button onClick={openInstagram} className="text-primary">
+          <Instagram />
+        </button>
+      </div>
+      {/* NAV */}
+      <div className="absolute inset-0 flex">
+        <button className="flex-1" onClick={prev}/>
+        <button className="flex-1" onClick={next}/>
+      </div>
+
+      {/* BOTTOM CARD PREMIUM */}
+      <div className="absolute bottom-5 left-4 right-4">
+
+        <div className="bg-black/70 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
+
+          <h2 className="text-white text-lg font-semibold mb-2">
+            {slide.content || story.content}
+          </h2>
+
+          {/* ACTIONS */}
+          <div className="flex items-center gap-2 mb-3">
+
+            <button
+              onClick={() => toggleStoryLike(story.id)}
+              className={`px-3 py-1 rounded-full text-sm ${
+                story.isLiked ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white"
+              }`}
+            >
+              ❤️ {story.likesCount ?? 0}
+            </button>
+
+            {STORY_REACTIONS.map((r) => (
+              <button
+                key={r}
+                onClick={() => setStoryReaction(story.id, r)}
+                className={`h-8 w-8 rounded-full ${
+                  story.myReaction === r ? "bg-primary/20" : "bg-white/10"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+
+          {/* INPUT */}
+          {storySource === "home" && (
+            <div className="flex gap-2">
+              <input
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Reply..."
+                className="flex-1 bg-white/10 rounded-full px-3 py-2 text-white text-sm outline-none"
+              />
+              <button
+                onClick={() => {
+                  if (!replyText.trim()) return
+                  addStoryReply(story.id, replyText)
+                  setReplyText("")
+                }}
+                className="bg-primary text-black px-3 rounded-full"
+              >
+                <Send className="h-4 w-4"/>
+              </button>
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      <style jsx global>{`
+        .story-progress {
+          width: 100%;
+          transform-origin: left;
+          animation: progress 4.5s linear forwards;
+        }
+
+        @keyframes progress {
+          from { transform: scaleX(0); }
+          to { transform: scaleX(1); }
+        }
+      `}</style>
+    </div>
+  )
+}

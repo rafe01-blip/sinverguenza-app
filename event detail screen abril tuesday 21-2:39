@@ -1,0 +1,844 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import { useApp } from "@/lib/app-context"
+import { Button } from "@/components/ui/button"
+import {
+  ArrowLeft,
+  Heart,
+  Bookmark,
+  Calendar,
+  MapPin,
+  Clock,
+  Share2,
+  CheckCircle2,
+  User,
+  DollarSign,
+  Globe,
+  Lock,
+  GraduationCap,
+  Sparkles,
+  BadgeDollarSign,
+  Tag,
+  Instagram,
+  MessageCircle,
+  Send,
+  Users,
+  Phone,
+  X,
+  Link as LinkIcon,
+} from "lucide-react"
+import Image from "next/image"
+function formatDate(dateStr: string) {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
+}
+
+function formatTime(time?: string) {
+  if (!time) return ""
+  const [h, m] = time.split(":").map(Number)
+  const period = h >= 12 ? "PM" : "AM"
+  const hour = h % 12 || 12
+  return `${hour}:${m.toString().padStart(2, "0")} ${period}`
+}
+
+function getCategoryLabel(category?: string) {
+  switch (category) {
+    case "event":
+      return "Event"
+    case "class":
+      return "Class"
+    case "announcement":
+      return "Announcement"
+    default:
+      return "Event"
+  }
+}
+
+function getTagStyle(tag: string) {
+  switch (tag) {
+    case "Public":
+      return "bg-emerald-500/20 text-emerald-400 border border-emerald-500/20"
+    case "Private":
+      return "bg-orange-500/20 text-orange-400 border border-orange-500/20"
+    case "Free":
+      return "bg-blue-500/20 text-blue-400 border border-blue-500/20"
+    case "Paid":
+      return "bg-purple-500/20 text-purple-400 border border-purple-500/20"
+    case "Off Campus":
+      return "bg-cyan-500/20 text-cyan-400 border border-cyan-500/20"
+    case "Workshop":
+      return "bg-primary/20 text-primary border border-primary/20"
+    case "Dance":
+      return "bg-pink-500/20 text-pink-400 border border-pink-500/20"
+    case "18+":
+      return "bg-amber-500/20 text-amber-400 border border-amber-500/20"
+    case "21+":
+      return "bg-red-500/20 text-red-400 border border-red-500/20"
+    case "Family":
+      return "bg-emerald-500/20 text-emerald-400 border border-emerald-500/20"
+    case "Upcoming":
+      return "bg-primary/20 text-primary border border-primary/20"
+    case "Cancelled":
+      return "bg-red-500/20 text-red-400 border border-red-500/20"
+    case "Sold Out":
+      return "bg-orange-500/20 text-orange-400 border border-orange-500/20"
+    case "Completed":
+      return "bg-zinc-500/20 text-zinc-300 border border-zinc-500/20"
+    default:
+      return "bg-secondary text-secondary-foreground border border-border"
+  }
+}
+
+function extractFallbackValue(description: string | undefined, pattern: RegExp) {
+  const match = description?.match(pattern)
+  return match ? match[1].trim() : ""
+}
+
+function normalizeInstagramUrl(value: string) {
+  if (!value) return ""
+  if (value.startsWith("@")) {
+    return `https://www.instagram.com/${value.replace("@", "")}`
+  }
+  return value
+}
+
+function normalizeMapsUrl(location: string) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`
+}
+
+function normalizePhoneUrl(phone: string) {
+  return `tel:${phone.replace(/[^\d+]/g, "")}`
+}
+export function EventDetailScreen() {
+  const {
+    selectedEvent,
+    setCurrentScreen,
+    toggleLike,
+    toggleSave,
+    addComment,
+    addReplyToComment,
+    user,
+    creators,
+    openCreatorProfile,
+    goBack,
+  } = useApp()
+
+  const [isInterested, setIsInterested] = useState(false)
+  const [showAddedToCalendar, setShowAddedToCalendar] = useState(false)
+  const [commentText, setCommentText] = useState("")
+  const [isImageOpen, setIsImageOpen] = useState(false)
+  const [replyTo, setReplyTo] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState("")
+  const [expandedCommentId, setExpandedCommentId] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setMounted(true), 35)
+    return () => window.clearTimeout(id)
+  }, [])
+
+  if (!selectedEvent) {
+    setCurrentScreen("calendar")
+    return null
+  }
+
+  const safeComments = selectedEvent.comments ?? []
+
+  const creator = selectedEvent.organizerCreatorId
+    ? creators.find((item) => item.id === selectedEvent.organizerCreatorId)
+    : null
+
+  const hostName = selectedEvent.organizer || selectedEvent.hostName || "Host"
+
+  const hostInstagram =
+    selectedEvent.organizerInstagram ||
+    selectedEvent.hostInstagram ||
+    extractFallbackValue(selectedEvent.description, /Host Instagram:\s*([^\n]+)/i) ||
+    ""
+
+  const isFree =
+    selectedEvent.isFree === true ||
+    selectedEvent.pricing === "free" ||
+    selectedEvent.price === 0
+
+  const isPrivate = selectedEvent.visibility === "private"
+
+  const isOffCampus =
+    selectedEvent.isOffCampus === true ||
+    selectedEvent.activityTypes?.includes("off-campus") ||
+    selectedEvent.activityTypes?.includes("off campus") ||
+    false
+
+  const isWorkshop =
+    selectedEvent.isWorkshop === true ||
+    selectedEvent.activityTypes?.includes("workshop") ||
+    false
+
+  const isDance =
+    selectedEvent.isDance === true ||
+    selectedEvent.activityTypes?.includes("dance") ||
+    false
+  const endTime =
+    selectedEvent.endTime ||
+    extractFallbackValue(selectedEvent.description, /End Time:\s*([^\n]+)/i)
+
+  const onlineLink =
+    selectedEvent.onlineLink ||
+    extractFallbackValue(selectedEvent.description, /Online Link:\s*([^\n]+)/i)
+
+  const paymentMethod =
+    selectedEvent.paymentMethod
+      ? selectedEvent.paymentMethod.charAt(0).toUpperCase() + selectedEvent.paymentMethod.slice(1)
+      : extractFallbackValue(selectedEvent.description, /Payment Method:\s*([^\n]+)/i)
+
+  const zelleContact =
+    selectedEvent.zelleContact ||
+    selectedEvent.paymentValue ||
+    extractFallbackValue(selectedEvent.description, /Zelle Contact:\s*([^\n]+)/i)
+
+  const activityTypeText = useMemo(() => {
+    if (selectedEvent.activityTypes && selectedEvent.activityTypes.length > 0) {
+      return selectedEvent.activityTypes
+        .map((item) => {
+          if (item === "off-campus") return "Off Campus"
+          if (item === "workshop") return "Workshop"
+          if (item === "individual") return "Individual"
+          if (item === "dance") return "Dance"
+          if (item === "others") return "Others"
+          return item
+        })
+        .join(", ")
+    }
+
+    return extractFallbackValue(selectedEvent.description, /Activity Type:\s*([^\n]+)/i)
+  }, [selectedEvent])
+
+  const guestLimit =
+    selectedEvent.guestLimit?.toString() ||
+    extractFallbackValue(selectedEvent.description, /Guest Limit:\s*([^\n]+)/i)
+
+  const phoneNumber =
+    selectedEvent.phoneNumber ||
+    extractFallbackValue(selectedEvent.description, /(?:Phone Number|Phone|Contact Number|Contact):\s*([^\n]+)/i)
+
+  const ageRule =
+    selectedEvent.ageRule ||
+    extractFallbackValue(selectedEvent.description, /Age Rule:\s*([^\n]+)/i)
+
+  const specialInstructions =
+    selectedEvent.specialInstructions ||
+    extractFallbackValue(selectedEvent.description, /Special Instructions:\s*([^\n]+)/i)
+
+  const statusLabel = useMemo(() => {
+    const status = selectedEvent.status
+    if (status === "cancelled") return "Cancelled"
+    if (status === "sold-out") return "Sold Out"
+    if (status === "completed") return "Completed"
+    return "Upcoming"
+  }, [selectedEvent])
+
+  const cleanDescription = useMemo(() => {
+    return (selectedEvent.description || "")
+      .replace(/\n\nPayment Method:\s*[^\n]+/gi, "")
+      .replace(/\nZelle Contact:\s*[^\n]+/gi, "")
+      .replace(/\n\nActivity Type:\s*[^\n]+/gi, "")
+      .replace(/\n\nHost Instagram:\s*[^\n]+/gi, "")
+      .replace(/\n\nGuest Limit:\s*[^\n]+/gi, "")
+      .replace(/\n\nPhone Number:\s*[^\n]+/gi, "")
+      .replace(/\n\nPhone:\s*[^\n]+/gi, "")
+      .replace(/\n\nContact Number:\s*[^\n]+/gi, "")
+      .replace(/\n\nContact:\s*[^\n]+/gi, "")
+      .replace(/\n\nEnd Time:\s*[^\n]+/gi, "")
+      .replace(/\n\nOnline Link:\s*[^\n]+/gi, "")
+      .replace(/\n\nAge Rule:\s*[^\n]+/gi, "")
+      .replace(/\n\nSpecial Instructions:\s*[^\n]+/gi, "")
+      .replace(/\n\nStatus:\s*[^\n]+/gi, "")
+      .trim()
+  }, [selectedEvent])
+  const detailTags = useMemo(() => {
+    const tags: string[] = []
+
+    tags.push(getCategoryLabel(selectedEvent.category))
+    tags.push(isPrivate ? "Private" : "Public")
+    tags.push(isFree ? "Free" : "Paid")
+
+    if (isOffCampus) tags.push("Off Campus")
+    if (isWorkshop) tags.push("Workshop")
+    if (isDance) tags.push("Dance")
+
+    if (ageRule === "18+" || ageRule === "21+") {
+      tags.push(ageRule)
+    } else if (ageRule && ageRule.toLowerCase().includes("family")) {
+      tags.push("Family")
+    }
+
+    if (statusLabel) tags.push(statusLabel)
+
+    return [...new Set(tags)]
+  }, [selectedEvent, isPrivate, isFree, isOffCampus, isWorkshop, isDance, ageRule, statusLabel])
+
+  const commentsTotal =
+    safeComments.reduce(
+      (sum, comment) => sum + 1 + (comment.replies?.length ?? 0),
+      0
+    ) || selectedEvent.commentsCount || 0
+
+  const shareEvent = async () => {
+    const shareText = `${selectedEvent.title} • ${formatDate(selectedEvent.date)} • ${formatTime(
+      selectedEvent.time
+    )}${endTime ? ` - ${formatTime(endTime)}` : ""} • ${selectedEvent.location || "Location TBD"}`
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: selectedEvent.title,
+          text: shareText,
+        })
+        return
+      } catch {}
+    }
+
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareText)
+      } catch {}
+    }
+  }
+
+  const handleAddToCalendar = () => {
+    setShowAddedToCalendar(true)
+    setTimeout(() => setShowAddedToCalendar(false), 2000)
+  }
+
+  const handleOpenInstagram = () => {
+    if (!hostInstagram) return
+    const url = normalizeInstagramUrl(hostInstagram)
+    if (typeof window !== "undefined") {
+      window.open(url, "_blank", "noopener,noreferrer")
+    }
+  }
+
+  const handleOpenMaps = () => {
+    if (!selectedEvent.location) return
+    if (typeof window !== "undefined") {
+      window.open(normalizeMapsUrl(selectedEvent.location), "_blank", "noopener,noreferrer")
+    }
+  }
+
+  const handleOpenPhone = () => {
+    if (!phoneNumber) return
+    if (typeof window !== "undefined") {
+      window.location.href = normalizePhoneUrl(phoneNumber)
+    }
+  }
+
+  const handleOpenOnlineLink = () => {
+    if (!onlineLink) return
+    if (typeof window !== "undefined") {
+      window.open(onlineLink, "_blank", "noopener,noreferrer")
+    }
+  }
+
+  const handleAddComment = () => {
+    if (!commentText.trim()) return
+    addComment(selectedEvent.id, commentText.trim())
+    setCommentText("")
+  }
+
+  const handleAddReply = (commentId: string) => {
+    if (!replyText.trim()) return
+    addReplyToComment(selectedEvent.id, commentId, replyText.trim())
+    setReplyText("")
+    setReplyTo(null)
+    setExpandedCommentId(commentId)
+  }
+  return (
+    <>
+      <div className="min-h-screen bg-background">
+        <div
+          className="relative h-[21rem] overflow-hidden bg-gradient-to-b from-muted to-background"
+          style={{
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? "scale(1)" : "scale(1.02)",
+            transition:
+              "opacity 320ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
+        >
+          <button
+            onClick={() => setIsImageOpen(true)}
+            className="absolute inset-0 z-0"
+            aria-label="Open event image"
+          >
+            <Image
+              src={selectedEvent.image || "/placeholder.svg"}
+              alt={selectedEvent.title}
+              fill
+              className="object-cover scale-[1.02]"
+            />
+          </button>
+
+          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/10 to-background/95" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-[radial-gradient(circle_at_center,rgba(201,168,76,0.08),transparent_65%)]" />
+
+          <button
+            onClick={goBack}
+            className="absolute top-4 left-4 z-10 p-2.5 rounded-full bg-background/80 backdrop-blur-md text-foreground hover:bg-background transition-colors shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+
+          <button
+            onClick={shareEvent}
+            className="absolute top-4 right-4 z-10 p-2.5 rounded-full bg-background/80 backdrop-blur-md text-foreground hover:bg-background transition-colors shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+          >
+            <Share2 className="h-5 w-5" />
+          </button>
+        </div>
+        <div
+          className="px-5 pb-36 -mt-16 relative"
+          style={{
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? "translateY(0px)" : "translateY(10px)",
+            transition:
+              "opacity 360ms ease 70ms, transform 460ms cubic-bezier(0.22, 1, 0.36, 1) 70ms",
+          }}
+        >
+          <div className="flex flex-wrap items-center gap-2 mb-5">
+            {detailTags.map((tag) => (
+              <span
+                key={tag}
+                className={`px-3 py-1 rounded-full text-xs font-medium backdrop-blur-sm ${getTagStyle(tag)}`}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+
+          <h1 className="text-[2.25rem] leading-[1.04] font-bold tracking-[-0.03em] text-foreground mb-5 text-balance">
+            {selectedEvent.title}
+          </h1>
+
+          <div className="rounded-[26px] border border-border bg-card/90 backdrop-blur-sm p-4 shadow-[0_14px_32px_rgba(0,0,0,0.14)]">
+            <div className="space-y-3.5">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Calendar className="h-5 w-5 text-primary shrink-0" />
+                <span className="capitalize">{formatDate(selectedEvent.date)}</span>
+              </div>
+
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Clock className="h-5 w-5 text-primary shrink-0" />
+                <span>
+                  {formatTime(selectedEvent.time)}
+                  {endTime ? ` - ${formatTime(endTime)}` : ""}
+                </span>
+              </div>
+
+              <button
+                onClick={handleOpenMaps}
+                disabled={!selectedEvent.location}
+                className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors disabled:pointer-events-none disabled:opacity-100"
+              >
+                <MapPin className="h-5 w-5 text-primary shrink-0" />
+                <span>{selectedEvent.location || "Location TBD"}</span>
+              </button>
+
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <User className="h-5 w-5 text-primary shrink-0" />
+                <span>Host by {hostName}</span>
+              </div>
+
+              {creator && (
+                <button
+                  onClick={() => openCreatorProfile(creator.id)}
+                  className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Users className="h-5 w-5 text-primary shrink-0" />
+                  <span>View host profile</span>
+                </button>
+              )}
+
+              {hostInstagram && (
+                <button
+                  onClick={handleOpenInstagram}
+                  className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Instagram className="h-5 w-5 text-primary shrink-0" />
+                  <span>Open host Instagram</span>
+                </button>
+              )}
+
+              {onlineLink && (
+                <button
+                  onClick={handleOpenOnlineLink}
+                  className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <LinkIcon className="h-5 w-5 text-primary shrink-0" />
+                  <span>Join online event</span>
+                </button>
+              )}
+
+              {phoneNumber && (
+                <button
+                  onClick={handleOpenPhone}
+                  className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Phone className="h-5 w-5 text-primary shrink-0" />
+                  <span>{phoneNumber}</span>
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="mt-4 rounded-[26px] border border-border bg-card/70 backdrop-blur-sm p-4 shadow-[0_14px_32px_rgba(0,0,0,0.10)]">
+            <div className="space-y-3.5">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                {isPrivate ? (
+                  <Lock className="h-5 w-5 text-primary shrink-0" />
+                ) : (
+                  <Globe className="h-5 w-5 text-primary shrink-0" />
+                )}
+                <span>{isPrivate ? "Private event" : "Public event"}</span>
+              </div>
+
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <DollarSign className="h-5 w-5 text-primary shrink-0" />
+                <span>{isFree ? "Free" : `$${selectedEvent.price || 0}`}</span>
+              </div>
+
+              {!isFree && paymentMethod && (
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <BadgeDollarSign className="h-5 w-5 text-primary shrink-0" />
+                  <span>Payment method: {paymentMethod}</span>
+                </div>
+              )}
+
+              {!isFree && paymentMethod?.toLowerCase() === "zelle" && zelleContact && (
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <BadgeDollarSign className="h-5 w-5 text-primary shrink-0" />
+                  <span>Zelle: {zelleContact}</span>
+                </div>
+              )}
+
+              {isWorkshop && (
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <GraduationCap className="h-5 w-5 text-primary shrink-0" />
+                  <span>Workshop activity</span>
+                </div>
+              )}
+
+              {activityTypeText && (
+                <div className="flex items-start gap-3 text-muted-foreground">
+                  <Tag className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                  <span>{activityTypeText}</span>
+                </div>
+              )}
+
+              {isDance && (
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <Sparkles className="h-5 w-5 text-primary shrink-0" />
+                  <span>Dance event</span>
+                </div>
+              )}
+
+              {guestLimit && (
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <Users className="h-5 w-5 text-primary shrink-0" />
+                  <span>Guest limit: {guestLimit}</span>
+                </div>
+              )}
+
+              {ageRule && (
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <Users className="h-5 w-5 text-primary shrink-0" />
+                  <span>
+                    Age rule: {ageRule === "family" ? "Family Friendly" : ageRule}
+                  </span>
+                </div>
+              )}
+
+              {specialInstructions && (
+                <div className="flex items-start gap-3 text-muted-foreground">
+                  <Tag className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                  <span>{specialInstructions}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-6 mt-5 rounded-2xl border border-border bg-card/70 px-4 py-3 shadow-[0_10px_24px_rgba(0,0,0,0.10)]">
+            <button
+              onClick={() => toggleLike(selectedEvent.id)}
+              className="flex items-center gap-2 active:scale-95 transition-transform"
+            >
+              <Heart
+                className={`h-6 w-6 ${
+                  selectedEvent.isLiked ? "fill-red-500 text-red-500" : "text-muted-foreground"
+                }`}
+              />
+              <span className="text-muted-foreground">{selectedEvent.likes ?? 0}</span>
+            </button>
+
+            <button
+              onClick={() => toggleSave(selectedEvent.id)}
+              className="flex items-center gap-2 active:scale-95 transition-transform"
+            >
+              <Bookmark
+                className={`h-6 w-6 ${
+                  selectedEvent.isSaved ? "fill-primary text-primary" : "text-muted-foreground"
+                }`}
+              />
+              <span className="text-muted-foreground">
+                {selectedEvent.isSaved ? "Saved" : "Save"}
+              </span>
+            </button>
+
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <MessageCircle className="h-6 w-6" />
+              <span>{commentsTotal}</span>
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-[26px] border border-border bg-card/60 p-5 shadow-[0_10px_24px_rgba(0,0,0,0.08)]">
+            <h2 className="text-[1.7rem] font-bold tracking-[-0.02em] text-foreground mb-3">
+              Description
+            </h2>
+            <p className="text-muted-foreground leading-8 text-[0.98rem]">
+              {cleanDescription || "No description available."}
+            </p>
+          </div>
+          <div className="mt-10 rounded-[26px] border border-border bg-card/60 p-5 shadow-[0_10px_24px_rgba(0,0,0,0.08)]">
+            <h2 className="text-[1.7rem] font-bold tracking-[-0.02em] text-foreground mb-4">
+              Comments
+            </h2>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-11 h-11 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border border-primary/10">
+                <span className="text-sm font-medium text-primary">
+                  {user?.name?.charAt(0) || "U"}
+                </span>
+              </div>
+
+              <input
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value.slice(0, 120))}
+                placeholder="Write a comment..."
+                className="flex-1 h-12 px-4 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    handleAddComment()
+                  }
+                }}
+              />
+
+              <Button
+                size="sm"
+                onClick={handleAddComment}
+                disabled={!commentText.trim()}
+                className="h-12 w-12 p-0 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {safeComments.length === 0 ? (
+              <div className="py-10 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No comments yet. Be the first to comment!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[28rem] overflow-y-auto pr-1">
+                {safeComments.slice().reverse().map((comment) => {
+                  const expanded = expandedCommentId === comment.id
+                  const replying = replyTo === comment.id
+
+                  return (
+                    <div
+                      key={comment.id}
+                      className="rounded-2xl border border-border bg-card p-4 shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+                    >
+                      <button
+                        onClick={() =>
+                          setExpandedCommentId(expanded ? null : comment.id)
+                        }
+                        className="w-full text-left"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-foreground">
+                            {comment.userName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(comment.createdAt).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </p>
+                        </div>
+
+                        <p className="text-sm text-muted-foreground mt-1.5 leading-7">
+                          {comment.text}
+                        </p>
+                      </button>
+
+                      <div className="mt-3 flex items-center gap-4">
+                        <button
+                          onClick={() => {
+                            setReplyTo(replying ? null : comment.id)
+                            setExpandedCommentId(comment.id)
+                          }}
+                          className="text-xs text-primary hover:opacity-80 transition-opacity"
+                        >
+                          Reply
+                        </button>
+
+                        {(comment.replies?.length ?? 0) > 0 && (
+                          <button
+                            onClick={() =>
+                              setExpandedCommentId(expanded ? null : comment.id)
+                            }
+                            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {expanded
+                              ? "Hide replies"
+                              : `View replies (${comment.replies?.length ?? 0})`}
+                          </button>
+                        )}
+                      </div>
+
+                      {replying && (
+                        <div className="mt-3 flex items-center gap-2">
+                          <input
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value.slice(0, 120))}
+                            placeholder={`Reply to ${comment.userName}...`}
+                            className="flex-1 h-10 px-3 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault()
+                                handleAddReply(comment.id)
+                              }
+                            }}
+                          />
+
+                          <Button
+                            size="sm"
+                            onClick={() => handleAddReply(comment.id)}
+                            disabled={!replyText.trim()}
+                            className="h-10 px-3 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+
+                      {expanded && (comment.replies?.length ?? 0) > 0 && (
+                        <div className="mt-3 space-y-2 pl-4 border-l border-border">
+                          {comment.replies!.map((reply) => (
+                            <div
+                              key={reply.id}
+                              className="rounded-xl bg-background/70 px-3 py-3 border border-border/60"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-xs font-medium text-foreground">
+                                  {reply.userName}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {new Date(reply.createdAt).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </p>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1.5 leading-6">
+                                {reply.text}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div
+            className="fixed bottom-0 left-0 right-0 bg-background/92 backdrop-blur-md border-t border-border p-4"
+            style={{
+              paddingBottom: "max(env(safe-area-inset-bottom), 16px)",
+              opacity: mounted ? 1 : 0,
+              transform: mounted ? "translateY(0px)" : "translateY(14px)",
+              transition:
+                "opacity 360ms ease 120ms, transform 420ms cubic-bezier(0.22, 1, 0.36, 1) 120ms",
+            }}
+          >
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 h-14 rounded-2xl border-border bg-transparent hover:bg-card"
+                onClick={handleAddToCalendar}
+              >
+                {showAddedToCalendar ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
+                    Added!
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Add to Calendar
+                  </>
+                )}
+              </Button>
+
+              <Button
+                className="flex-1 h-14 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_10px_30px_rgba(201,168,76,0.18)]"
+                onClick={() => setIsInterested(!isInterested)}
+              >
+                {isInterested ? "Interested!" : "I'm Interested"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {isImageOpen && (
+        <div className="fixed inset-0 z-[100] bg-black">
+          <button
+            onClick={() => setIsImageOpen(false)}
+            className="absolute top-4 left-4 z-[110] p-2 rounded-full bg-black/70 text-white"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+
+          <button
+            onClick={() => setIsImageOpen(false)}
+            className="absolute top-4 right-4 z-[110] p-2 rounded-full bg-black/70 text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          <button
+            onClick={() => setIsImageOpen(false)}
+            className="absolute inset-0"
+            aria-label="Close image preview"
+          >
+            <Image
+              src={selectedEvent.image || "/placeholder.svg"}
+              alt={selectedEvent.title}
+              fill
+              className="object-contain"
+            />
+          </button>
+        </div>
+      )}
+    </>
+  )
+}

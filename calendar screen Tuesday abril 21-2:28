@@ -1,0 +1,762 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import { useApp, EventType } from "@/lib/app-context"
+import { TopHeader } from "@/components/navigation/top-header"
+import { BottomNav } from "@/components/navigation/bottom-nav"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Clock,
+  MapPin,
+  Calendar as CalendarIcon,
+  Heart,
+  Bookmark,
+  MessageCircle,
+  SlidersHorizontal,
+  Search,
+  X,
+} from "lucide-react"
+import Image from "next/image"
+
+type FilterKey =
+  | "public"
+  | "private"
+  | "free"
+  | "paid"
+  | "offCampus"
+  | "workshop"
+  | "individual"
+  | "dance"
+
+const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
+  { key: "public", label: "🌐 Public" },
+  { key: "private", label: "🔒 Private" },
+  { key: "free", label: "🎉 Free" },
+  { key: "paid", label: "💰 Paid" },
+  { key: "offCampus", label: "📍 Off Campus" },
+  { key: "workshop", label: "🎓 Workshop" },
+  { key: "individual", label: "👤 Individual" },
+  { key: "dance", label: "💃 Dance" },
+]
+
+function formatTime12h(time: string) {
+  const [hours, minutes] = time.split(":").map(Number)
+  const period = hours >= 12 ? "PM" : "AM"
+  const displayHours = hours % 12 || 12
+  return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`
+}
+
+function formatDateString(date: Date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function getCategoryLabel(event: EventType) {
+  if (event.category === "class") return "Class"
+  if (event.category === "announcement") return "Announcement"
+  return "Event"
+}
+
+function getVisibilityLabel(event: EventType) {
+  if (event.visibility === "private" || event.isPublic === false) return "Private"
+  return "Public"
+}
+
+function isEventFree(event: EventType) {
+  return event.isFree || event.pricing === "free" || event.price === 0
+}
+
+function isEventOffCampus(event: EventType) {
+  return (
+    event.isOffCampus ||
+    event.activityTypes?.includes("off-campus") ||
+    event.activityTypes?.includes("off campus") ||
+    false
+  )
+}
+
+function isEventWorkshop(event: EventType) {
+  return event.isWorkshop || event.activityTypes?.includes("workshop") || false
+}
+
+function isEventDance(event: EventType) {
+  return event.isDance || event.activityTypes?.includes("dance") || false
+}
+
+function Badge({
+  label,
+  tone = "default",
+}: {
+  label: string
+  tone?: "default" | "green" | "gold" | "orange" | "pink"
+}) {
+  const toneClass =
+    tone === "green"
+      ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/35"
+      : tone === "gold"
+      ? "bg-primary/15 text-primary border-primary/35"
+      : tone === "orange"
+      ? "bg-orange-500/15 text-orange-400 border-orange-500/35"
+      : tone === "pink"
+      ? "bg-pink-500/15 text-pink-400 border-pink-500/35"
+      : "bg-secondary text-foreground border-border"
+
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-[5px] rounded-full text-[10px] font-medium border leading-none ${toneClass}`}
+    >
+      {label}
+    </span>
+  )
+}
+
+function CompactEventCard({
+  event,
+  onOpen,
+  isOpening = false,
+  index = 0,
+  mounted = true,
+}: {
+  event: EventType
+  onOpen: () => void
+  isOpening?: boolean
+  index?: number
+  mounted?: boolean
+}) {
+  const isFree = isEventFree(event)
+  const isWorkshop = isEventWorkshop(event)
+  const isDance = isEventDance(event)
+
+  return (
+    <button
+      onClick={onOpen}
+      className="w-[92%] max-w-[370px] mx-auto text-left bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/30 transition-all duration-300"
+      style={{
+        transform: isOpening
+          ? "scale(0.985)"
+          : mounted
+          ? "translateY(0px)"
+          : "translateY(10px)",
+        opacity: mounted ? (isOpening ? 0.82 : 1) : 0,
+        transition:
+          "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease, border-color 220ms ease, box-shadow 260ms ease",
+        transitionDelay: mounted ? `${Math.min(index * 45, 220)}ms` : "0ms",
+        boxShadow: isOpening
+          ? "0 10px 26px rgba(0,0,0,0.28)"
+          : "0 8px 20px rgba(0,0,0,0.12)",
+      }}
+    >
+      <div className="flex gap-3 p-3">
+        <div className="relative w-[92px] h-[92px] shrink-0 rounded-xl overflow-hidden bg-muted border border-border">
+          <Image
+            src={event.image || "/placeholder.svg"}
+            alt={event.title}
+            fill
+            className="object-cover"
+          />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex flex-wrap gap-1.5">
+              <Badge label={getCategoryLabel(event)} tone="gold" />
+              <Badge
+                label={getVisibilityLabel(event)}
+                tone={getVisibilityLabel(event) === "Public" ? "green" : "orange"}
+              />
+            </div>
+
+            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+          </div>
+
+          <h3 className="mt-2 text-[13px] font-semibold text-foreground line-clamp-2 leading-[1.25]">
+            {event.title}
+          </h3>
+
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span>{formatTime12h(event.time)}</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 min-w-0">
+              <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span className="truncate max-w-[110px]">
+                {event.location || "Location"}
+              </span>
+            </div>
+
+            <Badge
+              label={isFree ? "Free" : `$${event.price || 0}`}
+              tone={isFree ? "green" : "orange"}
+            />
+
+            {isWorkshop && <Badge label="Workshop" tone="gold" />}
+            {isDance && <Badge label="Dance" tone="pink" />}
+          </div>
+        </div>
+      </div>
+
+      <div className="px-3 py-2 border-t border-border flex items-center justify-between">
+        <div className="flex items-center gap-4 text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <Heart className="h-4 w-4" />
+            <span className="text-[11px]">{event.likes ?? 0}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <Bookmark className="h-4 w-4" />
+            <span className="text-[11px]">{event.isSaved ? "Saved" : "Save"}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <MessageCircle className="h-4 w-4" />
+            <span className="text-[11px]">
+              {event.comments?.length ?? event.commentsCount ?? 0}
+            </span>
+          </div>
+        </div>
+
+        <span className="text-primary text-[12px] font-medium whitespace-nowrap">
+          View details
+        </span>
+      </div>
+    </button>
+  )
+}
+
+export function CalendarScreen() {
+  const {
+    events,
+    setSelectedEvent,
+    setLastEventSource,
+    setCurrentScreen,
+    calendarFilters,
+    setCalendarFilters,
+    selectedDate,
+    setSelectedDate,
+    currentMonth,
+    setCurrentMonth,
+    calendarSearchOpen,
+    setCalendarSearchOpen,
+    calendarSearchQuery,
+    setCalendarSearchQuery,
+  } = useApp()
+
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [calendarCollapsed, setCalendarCollapsed] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [openingEventId, setOpeningEventId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setMounted(true), 40)
+    return () => window.clearTimeout(id)
+  }, [])
+
+  const today = new Date(2026, 3, 4)
+
+  const parsedSelectedDate = selectedDate
+    ? new Date(selectedDate)
+    : new Date(2026, 3, 4)
+
+  const [currentDate, setCurrentDate] = useState(
+    new Date(today.getFullYear(), currentMonth, 1)
+  )
+
+  const selectedFilters = calendarFilters as FilterKey[]
+
+  const demoEvents: EventType[] = [
+    {
+      id: "cal-demo-0",
+      title: "Pre-Season Meetup",
+      date: "2026-04-03",
+      time: "19:00",
+      location: "Main Hall",
+      image: "/placeholder.svg",
+      category: "event",
+      visibility: "public",
+      pricing: "free",
+      price: 0,
+      likes: 12,
+      isSaved: false,
+      comments: [],
+      commentsCount: 0,
+      isDance: true,
+    },
+    {
+      id: "cal-demo-1",
+      title: "New Season Announcement",
+      date: "2026-04-04",
+      time: "12:00",
+      location: "Online",
+      image: "/placeholder.svg",
+      category: "announcement",
+      visibility: "public",
+      pricing: "free",
+      price: 0,
+      likes: 89,
+      isSaved: false,
+      comments: [],
+      commentsCount: 0,
+    },
+    {
+      id: "cal-demo-2",
+      title: "Bachata Fundamentals",
+      date: "2026-04-04",
+      time: "18:00",
+      location: "Studio A, Sin Vergüenza HQ",
+      image: "/placeholder.svg",
+      category: "class",
+      visibility: "public",
+      pricing: "free",
+      price: 0,
+      likes: 28,
+      isSaved: false,
+      comments: [],
+      commentsCount: 0,
+      isDance: true,
+    },
+    {
+      id: "cal-demo-3",
+      title: "Salsa Night Showcase",
+      date: "2026-04-04",
+      time: "20:00",
+      location: "Centro Cultural, NYC",
+      image: "/placeholder.svg",
+      category: "event",
+      visibility: "public",
+      pricing: "paid",
+      price: 25,
+      likes: 45,
+      isSaved: false,
+      comments: [],
+      commentsCount: 0,
+      isDance: true,
+      isOffCampus: true,
+    },
+    {
+      id: "cal-demo-4",
+      title: "Advanced Salsa Techniques",
+      date: "2026-04-05",
+      time: "19:30",
+      location: "Studio B, Sin Vergüenza HQ",
+      image: "/placeholder.svg",
+      category: "class",
+      visibility: "public",
+      pricing: "paid",
+      price: 20,
+      likes: 34,
+      isSaved: true,
+      comments: [],
+      commentsCount: 0,
+      isDance: true,
+      isWorkshop: true,
+    },
+  ]
+
+  const sourceEvents = events.length > 0 ? events : demoEvents
+  const year = currentDate.getFullYear()
+  const month = currentDate.getMonth()
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const firstDayOfMonth = new Date(year, month, 1).getDay()
+
+  const calendarDays = useMemo(() => {
+    const days: (number | null)[] = []
+    for (let i = 0; i < firstDayOfMonth; i++) days.push(null)
+    for (let i = 1; i <= daysInMonth; i++) days.push(i)
+    return days
+  }, [firstDayOfMonth, daysInMonth])
+
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ]
+
+  const dayNames = ["S", "M", "T", "W", "T", "F", "S"]
+
+  const prevMonth = () => {
+    const newDate = new Date(year, month - 1, 1)
+    setCurrentMonth(newDate.getMonth())
+    setCurrentDate(newDate)
+  }
+
+  const nextMonth = () => {
+    const newDate = new Date(year, month + 1, 1)
+    setCurrentMonth(newDate.getMonth())
+    setCurrentDate(newDate)
+  }
+
+  const hasEventsOnDay = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+    return sourceEvents.some((e) => e.date === dateStr)
+  }
+
+  const isSelectedDay = (day: number) => {
+    return (
+      parsedSelectedDate.getDate() === day &&
+      parsedSelectedDate.getMonth() === month &&
+      parsedSelectedDate.getFullYear() === year
+    )
+  }
+
+  const toggleFilter = (filter: FilterKey) => {
+    if (selectedFilters.includes(filter)) {
+      setCalendarFilters(selectedFilters.filter((f) => f !== filter))
+    } else {
+      setCalendarFilters([...selectedFilters, filter])
+    }
+  }
+
+  const clearAllFilters = () => {
+    setCalendarFilters([])
+  }
+
+  const filteredEvents = useMemo(() => {
+    const dateStr = formatDateString(parsedSelectedDate)
+
+    let filtered = sourceEvents.filter((e) => e.date === dateStr)
+
+    if (calendarSearchQuery.trim()) {
+      const q = calendarSearchQuery.toLowerCase()
+      filtered = filtered.filter((event) =>
+        (event.title || "").toLowerCase().includes(q) ||
+        (event.shortDescription || "").toLowerCase().includes(q) ||
+        (event.description || "").toLowerCase().includes(q) ||
+        (event.location || "").toLowerCase().includes(q)
+      )
+    }
+
+    if (selectedFilters.length === 0) return filtered
+
+    return filtered.filter((event) =>
+      selectedFilters.every((filter) => {
+        switch (filter) {
+          case "public":
+            return getVisibilityLabel(event) === "Public"
+          case "private":
+            return getVisibilityLabel(event) === "Private"
+          case "free":
+            return isEventFree(event)
+          case "paid":
+            return !isEventFree(event)
+          case "offCampus":
+            return isEventOffCampus(event)
+          case "workshop":
+            return isEventWorkshop(event)
+          case "individual":
+            return (event.description || "").toLowerCase().includes("individual")
+          case "dance":
+            return isEventDance(event)
+          default:
+            return true
+        }
+      })
+    )
+  }, [sourceEvents, parsedSelectedDate, selectedFilters, calendarSearchQuery])
+
+  const handleEventSelect = (event: EventType) => {
+    setOpeningEventId(event.id)
+
+    window.setTimeout(() => {
+      setSelectedEvent(event)
+      setLastEventSource("calendar")
+      setCurrentScreen("event-detail")
+      setOpeningEventId(null)
+    }, 150)
+  }
+
+  return (
+    <div className="h-screen bg-background flex flex-col">
+      <TopHeader title="Calendar" />
+
+      <div className="flex-1 flex flex-col overflow-hidden px-4 pb-28">
+        <div
+          className="shrink-0 bg-background pt-0 pb-2 space-y-2"
+          style={{
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? "translateY(0px)" : "translateY(8px)",
+            transition:
+              "opacity 320ms ease, transform 360ms cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
+        >
+          {!calendarSearchOpen ? (
+            <>
+              <div className="grid grid-cols-3 items-center gap-2">
+                <div className="flex justify-start">
+                  <button
+                    onClick={() => setFiltersOpen((prev) => !prev)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all ${
+                      selectedFilters.length > 0
+                        ? "bg-primary/20 border-primary shadow-[0_0_20px_rgba(201,168,76,0.08)]"
+                        : "bg-card border-border hover:bg-secondary"
+                    }`}
+                  >
+                    <SlidersHorizontal className="h-4 w-4" />
+                    <span className="text-sm font-medium">
+                      Filter {selectedFilters.length > 0 ? `(${selectedFilters.length})` : ""}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => {
+                      setFiltersOpen(false)
+                      setCalendarSearchOpen(true)
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border text-foreground hover:bg-secondary transition-colors"
+                  >
+                    <Search className="h-4 w-4" />
+                    <span className="text-sm font-medium">Search</span>
+                  </button>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setCurrentScreen("create-event")}
+                    className="flex items-center gap-1 px-5 py-2.5 bg-card border border-border rounded-full text-sm font-medium hover:bg-secondary"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create
+                  </button>
+                </div>
+              </div>
+
+              {selectedFilters.length > 0 && (
+                <div className="flex justify-center">
+                  <button
+                    onClick={clearAllFilters}
+                    className="px-3 py-2 rounded-full border border-border bg-card text-xs font-medium text-primary hover:bg-secondary transition-colors"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              )}
+
+              <div
+                className={`grid transition-all duration-300 ${
+                  filtersOpen
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="flex flex-wrap gap-2">
+                    {FILTER_OPTIONS.map((filter) => {
+                      const active = selectedFilters.includes(filter.key)
+                      return (
+                        <button
+                          key={filter.key}
+                          onClick={() => toggleFilter(filter.key)}
+                          className={`px-3 py-2 rounded-full text-xs font-medium border ${
+                            active
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-card border-border hover:bg-secondary"
+                          }`}
+                        >
+                          {filter.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-center gap-2">
+                <button
+                  onClick={() => setCalendarCollapsed(true)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    calendarCollapsed
+                      ? "bg-primary text-primary-foreground border-primary shadow-md"
+                      : "bg-card border-border hover:bg-secondary"
+                  }`}
+                >
+                  Focus
+                </button>
+
+                <button
+                  onClick={() => setCalendarCollapsed(false)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    !calendarCollapsed
+                      ? "bg-primary text-primary-foreground border-primary shadow-md"
+                      : "bg-card border-border hover:bg-secondary"
+                  }`}
+                >
+                  Expand
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setCalendarSearchOpen(false)
+                  setCalendarSearchQuery("")
+                }}
+                className="h-[50px] w-[50px] flex items-center justify-center rounded-full bg-card border border-border"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <input
+                value={calendarSearchQuery}
+                onChange={(e) => setCalendarSearchQuery(e.target.value)}
+                placeholder="Search events"
+                className="flex-1 h-[50px] rounded-full border border-border bg-card px-5 text-foreground placeholder:text-muted-foreground focus:outline-none"
+              />
+
+              <button
+                onClick={() => setCurrentScreen("create-event")}
+                className="px-5 h-[50px] bg-primary rounded-full text-primary-foreground"
+              >
+                Create
+              </button>
+            </div>
+          )}
+
+          {calendarCollapsed ? (
+            <div className="flex items-center gap-2 border-b border-border py-2">
+              <CalendarIcon className="h-5 w-5 text-primary" />
+              <h3 className="text-[18px] font-semibold text-foreground">
+                {parsedSelectedDate.toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </h3>
+            </div>
+          ) : (
+            <>
+              <div
+                className="bg-card border border-primary/15 rounded-[24px] p-2 max-w-[330px] mx-auto"
+                style={{
+                  opacity: mounted ? 1 : 0,
+                  transform: mounted ? "scale(1)" : "scale(0.985)",
+                  transition:
+                    "opacity 360ms ease 80ms, transform 420ms cubic-bezier(0.22, 1, 0.36, 1) 80ms",
+                  boxShadow: "0 14px 36px rgba(0,0,0,0.18)",
+                }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <button
+                    onClick={prevMonth}
+                    className="p-1.5 rounded-full hover:bg-secondary transition-colors"
+                  >
+                    <ChevronLeft className="h-5 w-5 text-foreground" />
+                  </button>
+
+                  <h3 className="text-[17px] font-serif font-semibold text-foreground">
+                    {monthNames[month]} {year}
+                  </h3>
+
+                  <button
+                    onClick={nextMonth}
+                    className="p-1.5 rounded-full hover:bg-secondary transition-colors"
+                  >
+                    <ChevronRight className="h-5 w-5 text-foreground" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-7 gap-1 mb-1">
+                  {dayNames.map((day, i) => (
+                    <div
+                      key={i}
+                      className="text-center text-[11px] font-medium text-muted-foreground py-1"
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-7 gap-[3px]">
+                  {calendarDays.map((day, i) =>
+                    day === null ? (
+                      <div key={i} />
+                    ) : (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          const newDate = new Date(year, month, day)
+                          setSelectedDate(newDate.toISOString())
+                        }}
+                        className={`relative h-[40px] rounded-[10px] border flex items-center justify-center text-[13px] font-medium transition-all ${
+                          isSelectedDay(day)
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-card text-foreground border-border hover:bg-secondary"
+                        }`}
+                      >
+                        <span>{day}</span>
+
+                        {hasEventsOnDay(day) && (
+                          <span
+                            className={`absolute bottom-1.5 h-1.5 w-1.5 rounded-full ${
+                              isSelectedDay(day)
+                                ? "bg-primary-foreground"
+                                : "bg-primary"
+                            }`}
+                          />
+                        )}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 border-b border-border py-3">
+                <CalendarIcon className="h-5 w-5 text-primary" />
+                <h3 className="text-[18px] font-semibold text-foreground">
+                  {parsedSelectedDate.toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </h3>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto pt-3 space-y-3">
+          {filteredEvents.length === 0 ? (
+            <div className="py-10 text-center">
+              <p className="text-muted-foreground">No events for this date</p>
+              <p className="text-sm text-muted-foreground/70 mt-1">
+                Try another day, search, or filters
+              </p>
+            </div>
+          ) : (
+            filteredEvents.map((event, index) => (
+              <CompactEventCard
+                key={event.id}
+                event={event}
+                index={index}
+                mounted={mounted}
+                isOpening={openingEventId === event.id}
+                onOpen={() => handleEventSelect(event)}
+              />
+            ))
+          )}
+        </div>
+      </div>
+
+      <BottomNav />
+    </div>
+  )
+}

@@ -1,0 +1,1560 @@
+"use client"
+
+import { useMemo, useRef, useState } from "react"
+import {
+  ShoppingBag,
+  Search,
+  SlidersHorizontal,
+  X,
+  ChevronRight,
+  Sparkles,
+} from "lucide-react"
+import { useApp, ProductType } from "@/lib/app-context"
+import { TopHeader } from "@/components/navigation/top-header"
+import { BottomNav } from "@/components/navigation/bottom-nav"
+
+const GOLD = "#C9A84C"
+const GOLD_DARK = "#8B6914"
+const DARK = "#0A0A0A"
+const CARD = "#121212"
+
+type ShopCategory =
+  | "all"
+  | "tops"
+  | "womens"
+  | "mens"
+  | "accessories"
+  | "auto"
+
+type SortKey = "featured" | "newest" | "price-low" | "price-high"
+
+type EnhancedProduct = ProductType & {
+  category: ShopCategory | string
+  gender?: "male" | "female" | "unisex"
+  compareAtPrice?: number
+  material?: string
+  fit?: string
+  care?: string
+  shippingNote?: string
+  availability?: "in-stock" | "low-stock" | "out-of-stock"
+  featured?: boolean
+  isNew?: boolean
+  isBestSeller?: boolean
+  isLimited?: boolean
+  sortOrder?: number
+  lifestyleImages?: string[]
+}
+
+const CATEGORY_LABELS: { key: ShopCategory; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "tops", label: "Tops" },
+  { key: "womens", label: "Women’s" },
+  { key: "mens", label: "Men’s" },
+  { key: "accessories", label: "Accessories" },
+  { key: "auto", label: "Auto" },
+]
+
+const DEMO_PRODUCTS: EnhancedProduct[] = [
+  {
+    id: "demo-hoodie",
+    name: "SV Hoodie",
+    price: 65,
+    compareAtPrice: 78,
+    image:
+      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ca830cf6-d971-4913-a7c3-6c61b328642a.jpeg",
+    images: [
+      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ca830cf6-d971-4913-a7c3-6c61b328642a.jpeg",
+      "/placeholder.svg?height=1200&width=1200&text=SV+Hoodie+Lifestyle",
+    ],
+    lifestyleImages: ["/placeholder.svg?height=1200&width=1200&text=SV+Hoodie+Lifestyle"],
+    shortDescription: "Premium heavyweight black hoodie with embossed gold SV logo.",
+    description:
+      "Premium heavyweight black hoodie with embossed gold SV logo. Soft fleece interior, structured fit, and elevated finish for rehearsals, class, or everyday wear.",
+    category: "tops",
+    sizes: ["XS", "S", "M", "L", "XL", "XXL"],
+    colors: ["Black/Gold"],
+    stock: 12,
+    availability: "in-stock",
+    featured: true,
+    isBestSeller: true,
+    badge: "Best Seller",
+    material: "Cotton blend fleece",
+    fit: "Relaxed premium fit",
+    care: "Machine wash cold, inside out",
+    shippingNote: "Free shipping on orders over $75",
+    gender: "unisex",
+    sortOrder: 1,
+  },
+  {
+    id: "demo-tee",
+    name: "SV Classic Tee",
+    price: 35,
+    image: "/placeholder.svg?height=1200&width=1200&text=SV+Classic+Tee",
+    images: [
+      "/placeholder.svg?height=1200&width=1200&text=SV+Classic+Tee",
+      "/placeholder.svg?height=1200&width=1200&text=SV+Classic+Tee+Lifestyle",
+    ],
+    lifestyleImages: ["/placeholder.svg?height=1200&width=1200&text=SV+Classic+Tee+Lifestyle"],
+    shortDescription: "100% cotton signature tee featuring the iconic SV gold logo.",
+    description:
+      "A clean signature tee with the iconic SV gold logo. Pre-shrunk feel, everyday comfort, and premium visual presence.",
+    category: "tops",
+    sizes: ["XS", "S", "M", "L", "XL", "XXL"],
+    colors: ["Black/Gold"],
+    stock: 18,
+    availability: "in-stock",
+    featured: true,
+    isNew: true,
+    badge: "New",
+    material: "100% cotton",
+    fit: "Relaxed fit",
+    care: "Machine wash cold",
+    shippingNote: "Usually ships in 2–4 business days",
+    gender: "unisex",
+    sortOrder: 2,
+  },
+  {
+    id: "demo-sports-bra",
+    name: "SV Sports Bra",
+    price: 38,
+    image: "/placeholder.svg?height=1200&width=1200&text=SV+Sports+Bra",
+    images: [
+      "/placeholder.svg?height=1200&width=1200&text=SV+Sports+Bra",
+      "/placeholder.svg?height=1200&width=1200&text=SV+Sports+Bra+Lifestyle",
+    ],
+    shortDescription: "Racerback sports bra with SV gold logo and premium support.",
+    description:
+      "Performance support piece designed for training, rehearsal, and movement. Clean silhouette with strong brand identity.",
+    category: "womens",
+    sizes: ["XS", "S", "M", "L", "XL"],
+    colors: ["Black/Gold"],
+    stock: 9,
+    availability: "low-stock",
+    isLimited: true,
+    badge: "Limited",
+    material: "Performance stretch fabric",
+    fit: "Supportive athletic fit",
+    care: "Machine wash cold, line dry",
+    shippingNote: "Limited drop item",
+    gender: "female",
+    sortOrder: 3,
+  },
+  {
+    id: "demo-leggings",
+    name: "SV Leggings",
+    price: 50,
+    image: "/placeholder.svg?height=1200&width=1200&text=SV+Leggings",
+    images: [
+      "/placeholder.svg?height=1200&width=1200&text=SV+Leggings",
+      "/placeholder.svg?height=1200&width=1200&text=SV+Leggings+Lifestyle",
+    ],
+    shortDescription: "High-waist performance leggings with sleek premium finish.",
+    description:
+      "High-waist performance leggings with elevated support and sleek movement-ready finish.",
+    category: "womens",
+    sizes: ["XS", "S", "M", "L", "XL"],
+    colors: ["Black/Gold"],
+    stock: 14,
+    availability: "in-stock",
+    material: "Compression performance knit",
+    fit: "High-waist sculpt fit",
+    care: "Cold wash, no bleach",
+    shippingNote: "Ships free with matching set",
+    gender: "female",
+    sortOrder: 4,
+  },
+  {
+    id: "demo-shorts-men",
+    name: "SV Dance Shorts",
+    price: 40,
+    image: "/placeholder.svg?height=1200&width=1200&text=SV+Dance+Shorts",
+    images: [
+      "/placeholder.svg?height=1200&width=1200&text=SV+Dance+Shorts",
+      "/placeholder.svg?height=1200&width=1200&text=SV+Dance+Shorts+Lifestyle",
+    ],
+    shortDescription: "Men’s athletic shorts with clean gold detail and light feel.",
+    description:
+      "Men’s movement shorts built for rehearsals and dance conditioning, with lightweight premium construction.",
+    category: "mens",
+    sizes: ["S", "M", "L", "XL", "XXL"],
+    colors: ["Black/Gold"],
+    stock: 10,
+    availability: "in-stock",
+    material: "Lightweight technical fabric",
+    fit: "Athletic fit",
+    care: "Machine wash cold",
+    shippingNote: "Popular item in men’s collection",
+    gender: "male",
+    sortOrder: 5,
+  },
+  {
+    id: "demo-cap",
+    name: "SV Snapback Cap",
+    price: 30,
+    image: "/placeholder.svg?height=1200&width=1200&text=SV+Snapback+Cap",
+    images: [
+      "/placeholder.svg?height=1200&width=1200&text=SV+Snapback+Cap",
+      "/placeholder.svg?height=1200&width=1200&text=SV+Snapback+Cap+Lifestyle",
+    ],
+    shortDescription: "Flat-brim snapback with gold-embroidered SV logo.",
+    description:
+      "Structured crown snapback with premium embroidery and clean black/gold finish.",
+    category: "accessories",
+    sizes: ["One Size"],
+    colors: ["Black/Gold"],
+    stock: 20,
+    availability: "in-stock",
+    material: "Structured cotton twill",
+    fit: "Adjustable snapback fit",
+    care: "Spot clean only",
+    shippingNote: "Ships in 2–3 business days",
+    gender: "unisex",
+    sortOrder: 6,
+  },
+  {
+    id: "demo-bag",
+    name: "SV Duffle Bag",
+    price: 55,
+    image: "/placeholder.svg?height=1200&width=1200&text=SV+Duffle+Bag",
+    images: [
+      "/placeholder.svg?height=1200&width=1200&text=SV+Duffle+Bag",
+      "/placeholder.svg?height=1200&width=1200&text=SV+Duffle+Bag+Lifestyle",
+    ],
+    shortDescription: "Large-capacity gym duffle with bold SV premium branding.",
+    description:
+      "Large-capacity duffle built for class, performance, and travel. Premium black shell with strong gold SV identity.",
+    category: "accessories",
+    sizes: ["One Size"],
+    colors: ["Black/Gold"],
+    stock: 6,
+    availability: "low-stock",
+    featured: true,
+    material: "Water-resistant performance shell",
+    fit: "One size",
+    care: "Wipe clean",
+    shippingNote: "Low stock",
+    gender: "unisex",
+    sortOrder: 7,
+  },
+  {
+    id: "demo-phone-case",
+    name: "SV Phone Case",
+    price: 25,
+    image: "/placeholder.svg?height=1200&width=1200&text=SV+Phone+Case",
+    images: [
+      "/placeholder.svg?height=1200&width=1200&text=SV+Phone+Case",
+      "/placeholder.svg?height=1200&width=1200&text=SV+Phone+Case+Lifestyle",
+    ],
+    shortDescription: "Matte black phone case with gold SV logo finish.",
+    description:
+      "A clean matte hard-shell phone case with signature SV mark for a premium lifestyle touch.",
+    category: "accessories",
+    sizes: ["iPhone 14", "iPhone 15", "Samsung S23", "Samsung S24"],
+    colors: ["Black/Gold"],
+    stock: 16,
+    availability: "in-stock",
+    material: "Hard shell matte finish",
+    fit: "Slim protective fit",
+    care: "Wipe clean",
+    shippingNote: "Compatible models listed",
+    gender: "unisex",
+    sortOrder: 8,
+  },
+  {
+    id: "demo-keychain",
+    name: "SV Gold Keychain",
+    price: 12,
+    image: "/placeholder.svg?height=1200&width=1200&text=SV+Gold+Keychain",
+    images: [
+      "/placeholder.svg?height=1200&width=1200&text=SV+Gold+Keychain",
+      "/placeholder.svg?height=1200&width=1200&text=SV+Gold+Keychain+Lifestyle",
+    ],
+    shortDescription: "Premium metal keychain featuring the SV logo in gold.",
+    description:
+      "Compact premium accessory with polished gold detailing and strong lifestyle appeal.",
+    category: "accessories",
+    sizes: ["One Size"],
+    colors: ["Gold"],
+    stock: 30,
+    availability: "in-stock",
+    isBestSeller: true,
+    badge: "Best Seller",
+    material: "Metal alloy",
+    fit: "One size",
+    care: "Wipe dry",
+    shippingNote: "Easy add-on item",
+    gender: "unisex",
+    sortOrder: 9,
+  },
+  {
+    id: "demo-water-bottle",
+    name: "SV Water Bottle",
+    price: 28,
+    image: "/placeholder.svg?height=1200&width=1200&text=SV+Water+Bottle",
+    images: [
+      "/placeholder.svg?height=1200&width=1200&text=SV+Water+Bottle",
+      "/placeholder.svg?height=1200&width=1200&text=SV+Water+Bottle+Lifestyle",
+    ],
+    shortDescription: "Insulated stainless steel bottle with clean SV gold branding.",
+    description:
+      "Double-wall insulated bottle designed for long dance days, training sessions, and everyday carry.",
+    category: "accessories",
+    sizes: ["32oz"],
+    colors: ["Black/Gold"],
+    stock: 22,
+    availability: "in-stock",
+    material: "Stainless steel insulated body",
+    fit: "32oz",
+    care: "Hand wash recommended",
+    shippingNote: "Drinkware category ready",
+    gender: "unisex",
+    sortOrder: 10,
+  },
+  {
+    id: "demo-car-mats",
+    name: "SV Car Floor Mats",
+    price: 55,
+    image: "/placeholder.svg?height=1200&width=1200&text=SV+Car+Floor+Mats",
+    images: [
+      "/placeholder.svg?height=1200&width=1200&text=SV+Car+Floor+Mats",
+      "/placeholder.svg?height=1200&width=1200&text=SV+Car+Floor+Mats+Lifestyle",
+    ],
+    shortDescription: "Heavy-duty mats with raised SV logo in premium black/gold.",
+    description:
+      "Durable car floor mats with raised SV branding and lifestyle auto energy. Built to make the brand feel bigger than apparel.",
+    category: "auto",
+    sizes: ["Universal Fit"],
+    colors: ["Black/Gold"],
+    stock: 8,
+    availability: "low-stock",
+    isLimited: true,
+    badge: "Limited",
+    material: "Heavy-duty rubber",
+    fit: "Universal fit",
+    care: "Rinse and air dry",
+    shippingNote: "Auto collection item",
+    gender: "unisex",
+    sortOrder: 11,
+  },
+  {
+    id: "demo-airpods",
+    name: "SV AirPods Case",
+    price: 20,
+    image: "/placeholder.svg?height=1200&width=1200&text=SV+AirPods+Case",
+    images: [
+      "/placeholder.svg?height=1200&width=1200&text=SV+AirPods+Case",
+      "/placeholder.svg?height=1200&width=1200&text=SV+AirPods+Case+Lifestyle",
+    ],
+    shortDescription: "Leather-textured AirPods case with gold SV logo and clip.",
+    description:
+      "Compact lifestyle accessory for your daily carry, finished in black and gold with strong brand identity.",
+    category: "accessories",
+    sizes: ["AirPods 1/2", "AirPods 3", "AirPods Pro"],
+    colors: ["Black/Gold"],
+    stock: 13,
+    availability: "in-stock",
+    material: "Textured shell with clip",
+    fit: "Model-based sizing",
+    care: "Wipe clean",
+    shippingNote: "Tech-ready accessory",
+    gender: "unisex",
+    sortOrder: 12,
+  },
+  {
+    id: "demo-air-freshener",
+    name: "SV Vent Clip Freshener",
+    price: 14,
+    image: "/placeholder.svg?height=1200&width=1200&text=SV+Vent+Clip+Freshener",
+    images: [
+      "/placeholder.svg?height=1200&width=1200&text=SV+Vent+Clip+Freshener",
+      "/placeholder.svg?height=1200&width=1200&text=SV+Vent+Clip+Freshener+Lifestyle",
+    ],
+    shortDescription: "Premium vent clip freshener with gold SV logo detail.",
+    description:
+      "A small but stylish auto accessory that makes the shop feel more like a lifestyle brand.",
+    category: "auto",
+    sizes: ["One Size"],
+    colors: ["Black/Gold"],
+    stock: 24,
+    availability: "in-stock",
+    material: "Fragrance insert + clip shell",
+    fit: "One size",
+    care: "Replace refill as needed",
+    shippingNote: "Auto collection item",
+    gender: "unisex",
+    sortOrder: 13,
+  },
+]
+
+function normalizeText(value?: string) {
+  return (value || "").trim().toLowerCase()
+}
+
+function toggleValue(list: string[], value: string) {
+  return list.includes(value)
+    ? list.filter((item) => item !== value)
+    : [...list, value]
+}
+
+function inferCategory(product: ProductType): ShopCategory {
+  const raw = (product.category || "").toLowerCase()
+  const name = (product.name || "").toLowerCase()
+
+  if (raw.includes("womens") || raw.includes("women") || raw === "female") return "womens"
+  if (raw.includes("mens") || raw.includes("men") || raw === "male") return "mens"
+  if (raw.includes("auto") || name.includes("car") || name.includes("airpods") || name.includes("tire")) {
+    return raw.includes("accessor") ? "accessories" : "auto"
+  }
+  if (raw.includes("accessor")) return "accessories"
+  if (
+    raw.includes("top") ||
+    name.includes("hoodie") ||
+    name.includes("tee") ||
+    name.includes("tank")
+  ) {
+    return "tops"
+  }
+  return "accessories"
+}
+
+function enrichProduct(product: ProductType, index: number): EnhancedProduct {
+  const shortDescription =
+    product.shortDescription ||
+    product.description?.slice(0, 74) ||
+    "Premium Sin Vergüenza merch with signature black-and-gold identity."
+
+  const category = inferCategory(product)
+
+  const availability: EnhancedProduct["availability"] =
+    typeof product.stock === "number"
+      ? product.stock <= 0
+        ? "out-of-stock"
+        : product.stock <= 8
+        ? "low-stock"
+        : "in-stock"
+      : "in-stock"
+
+  return {
+    ...product,
+    category,
+    shortDescription,
+    images:
+      product.images && product.images.length > 0
+        ? product.images
+        : [product.image || "/placeholder.svg"],
+    featured: product.badge === "Best Seller" || product.badge === "New" || index < 2,
+    availability,
+    isBestSeller: product.badge === "Best Seller",
+    isNew: product.badge === "New",
+    isLimited: product.badge === "Limited",
+    compareAtPrice:
+      product.price >= 50 ? Number((product.price * 1.18).toFixed(0)) : undefined,
+    material: "Premium signature finish",
+    fit: "True to size",
+    care: "Refer to care instructions",
+    shippingNote: "Ships in 2–4 business days",
+    gender: category === "mens" ? "male" : category === "womens" ? "female" : "unisex",
+    sortOrder: index + 1,
+    lifestyleImages: product.lifestyleImages ?? [],
+  }
+}
+
+function getBadgeLabel(product: EnhancedProduct) {
+  if (product.badge) return product.badge
+  if (product.isBestSeller) return "Best Seller"
+  if (product.isNew) return "New"
+  if (product.isLimited) return "Limited"
+  return ""
+}
+
+function getAvailabilityLabel(product: EnhancedProduct) {
+  if (product.availability === "out-of-stock") return "Out of Stock"
+  if (product.availability === "low-stock") return "Low Stock"
+  return "In Stock"
+}
+
+function ShopHero({ onShopNow }: { onShopNow: () => void }) {
+  return (
+    <div style={heroWrap}>
+      <div style={heroOverlay} />
+      <div style={heroGlow} />
+      <div style={heroContent}>
+        <div style={heroEyebrow}>SIN VERGÜENZA COLLECTION</div>
+        <div style={heroTitle}>Premium Dancewear & Lifestyle</div>
+        <div style={heroText}>
+          Elevated black-and-gold essentials built to feel like a real brand, not just merch.
+        </div>
+        <button onClick={onShopNow} style={heroBtn}>
+          Shop Now
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function Badge({ label }: { label: string }) {
+  if (!label) return null
+  return <div style={badgeStyle}>{label}</div>
+}
+
+function ProductCard({
+  product,
+  isFavorite,
+  onToggleFavorite,
+  onOpen,
+  onQuickAdd,
+}: {
+  product: EnhancedProduct
+  isFavorite: boolean
+  onToggleFavorite: () => void
+  onOpen: () => void
+  onQuickAdd: () => void
+}) {
+  const badge = getBadgeLabel(product)
+  const outOfStock = product.availability === "out-of-stock"
+
+  return (
+    <div style={productCard}>
+      <div onClick={onOpen} style={imageHitArea}>
+        <img
+          src={product.images?.[0] || "/placeholder.svg"}
+          alt={product.name}
+          style={productImage}
+        />
+        <div style={imageOverlay} />
+
+        {badge && <Badge label={badge} />}
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleFavorite()
+          }}
+          style={favoriteBtn}
+        >
+          {isFavorite ? "★" : "☆"}
+        </button>
+
+        <div style={tapToViewWrap}>
+          <span style={tapToViewText}>Tap to View</span>
+        </div>
+      </div>
+
+      <div style={cardBody}>
+        <div style={productName}>{product.name}</div>
+        <div style={productDesc}>{product.shortDescription}</div>
+
+        <div style={metaRow}>
+          <div style={priceWrap}>
+            <div style={priceText}>${product.price}</div>
+            {product.compareAtPrice ? (
+              <div style={compareAtText}>${product.compareAtPrice}</div>
+            ) : null}
+          </div>
+
+          <div style={stockText}>{getAvailabilityLabel(product)}</div>
+        </div>
+
+        <div style={sizesLine}>
+          {product.sizes?.length ? `${product.sizes.length} sizes` : "One size"}
+        </div>
+
+        <button
+          onClick={onQuickAdd}
+          disabled={outOfStock}
+          style={{
+            ...addCartBtn,
+            opacity: outOfStock ? 0.45 : 1,
+            cursor: outOfStock ? "not-allowed" : "pointer",
+          }}
+        >
+          <ShoppingBag size={15} />
+          <span>{outOfStock ? "Unavailable" : "Add to Cart"}</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function ShopScreen() {
+  const {
+    products,
+    setSelectedProduct,
+    setCurrentScreen,
+    addToCart,
+    cartItems,
+  } = useApp()
+
+  const collectionRef = useRef<HTMLDivElement | null>(null)
+
+  const [activeCategory, setActiveCategory] = useState<ShopCategory>("all")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [sortBy, setSortBy] = useState<SortKey>("featured")
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([])
+  const [selectedColors, setSelectedColors] = useState<string[]>([])
+  const [priceFilter, setPriceFilter] = useState<"all" | "under-25" | "25-50" | "over-50">("all")
+  const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "in-stock" | "low-stock" | "out-of-stock">("all")
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({})
+
+  const sourceProducts = useMemo<EnhancedProduct[]>(() => {
+    if (products.length > 0) {
+      return products.map((product, index) => enrichProduct(product, index))
+    }
+    return DEMO_PRODUCTS
+  }, [products])
+
+  const categoryProducts = useMemo(() => {
+    if (activeCategory === "all") return sourceProducts
+    return sourceProducts.filter((product) => product.category === activeCategory)
+  }, [activeCategory, sourceProducts])
+
+  const allSizes = useMemo(() => {
+    return [...new Set(sourceProducts.flatMap((p) => p.sizes || []))].slice(0, 12)
+  }, [sourceProducts])
+
+  const allColors = useMemo(() => {
+    return [...new Set(sourceProducts.flatMap((p) => p.colors || []))].slice(0, 10)
+  }, [sourceProducts])
+
+  const filteredProducts = useMemo(() => {
+    let result = [...categoryProducts]
+
+    if (searchQuery.trim()) {
+      const q = normalizeText(searchQuery)
+      result = result.filter((product) =>
+        normalizeText(
+          [product.name, product.shortDescription, product.description, product.category].join(" ")
+        ).includes(q)
+      )
+    }
+
+    if (selectedSizes.length > 0) {
+      result = result.filter((product) => {
+        const productSizes = (product.sizes || []).map((size) => normalizeText(size))
+        return selectedSizes.some((size) => productSizes.includes(normalizeText(size)))
+      })
+    }
+
+    if (selectedColors.length > 0) {
+      result = result.filter((product) => {
+        const productColors = (product.colors || []).map((color) => normalizeText(color))
+        return selectedColors.some((color) => productColors.includes(normalizeText(color)))
+      })
+    }
+
+    if (priceFilter !== "all") {
+      result = result.filter((product) => {
+        if (priceFilter === "under-25") return product.price < 25
+        if (priceFilter === "25-50") return product.price >= 25 && product.price <= 50
+        if (priceFilter === "over-50") return product.price > 50
+        return true
+      })
+    }
+
+    if (availabilityFilter !== "all") {
+      result = result.filter(
+        (product) => normalizeText(product.availability) === normalizeText(availabilityFilter)
+      )
+    }
+
+    switch (sortBy) {
+      case "price-low":
+        result.sort((a, b) => a.price - b.price)
+        break
+      case "price-high":
+        result.sort((a, b) => b.price - a.price)
+        break
+      case "newest":
+        result.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
+        break
+      case "featured":
+      default:
+        result.sort((a, b) => {
+          const aScore =
+            (a.featured ? 3 : 0) +
+            (a.isBestSeller ? 2 : 0) +
+            (a.isNew ? 1 : 0) +
+            (a.isLimited ? 1 : 0)
+
+          const bScore =
+            (b.featured ? 3 : 0) +
+            (b.isBestSeller ? 2 : 0) +
+            (b.isNew ? 1 : 0) +
+            (b.isLimited ? 1 : 0)
+
+          return bScore - aScore
+        })
+        break
+    }
+
+    return result
+  }, [
+    categoryProducts,
+    searchQuery,
+    selectedSizes,
+    selectedColors,
+    priceFilter,
+    availabilityFilter,
+    sortBy,
+  ])
+
+  const featuredProducts = useMemo(() => {
+    return sourceProducts.filter((product) => product.featured).slice(0, 4)
+  }, [sourceProducts])
+
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+
+  const openProduct = (product: EnhancedProduct) => {
+    setSelectedProduct(product)
+    setCurrentScreen("product-detail")
+  }
+
+  const quickAddToCart = (product: EnhancedProduct) => {
+    const size = product.sizes?.[0] || "One Size"
+    const color = product.colors?.[0] || "Default"
+
+    addToCart({
+      product,
+      size,
+      color,
+      quantity: 1,
+    })
+  }
+
+  const toggleFavorite = (productId: string) => {
+    setFavorites((prev) => ({
+      ...prev,
+      [productId]: !prev[productId],
+    }))
+  }
+
+  const clearFilters = () => {
+    setSelectedSizes([])
+    setSelectedColors([])
+    setPriceFilter("all")
+    setAvailabilityFilter("all")
+    setSearchQuery("")
+    setSortBy("featured")
+  }
+
+  const activeFilterCount =
+    selectedSizes.length +
+    selectedColors.length +
+    (priceFilter !== "all" ? 1 : 0) +
+    (availabilityFilter !== "all" ? 1 : 0) +
+    (searchQuery.trim() ? 1 : 0)
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: DARK,
+        color: "#fff",
+        paddingBottom: 110,
+      }}
+    >
+      <TopHeader title="Shop" />
+
+      <div style={{ padding: "16px" }}>
+        <ShopHero
+          onShopNow={() =>
+            collectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+        />
+
+        <div style={toolbarWrap}>
+          <div style={searchWrap}>
+            <Search size={18} color="#a7a7a7" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search merch"
+              style={searchInput}
+            />
+            {searchQuery ? (
+              <button onClick={() => setSearchQuery("")} style={clearSearchBtn}>
+                <X size={15} />
+              </button>
+            ) : null}
+          </div>
+
+          <button onClick={() => setCurrentScreen("cart")} style={cartPillBtn}>
+            <ShoppingBag size={16} />
+            <span>Cart</span>
+            {cartCount > 0 ? <span style={cartCountBubble}>{cartCount}</span> : null}
+          </button>
+        </div>
+
+        <div style={controlsRow}>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((prev) => !prev)}
+            style={filtersOpen || activeFilterCount > 0 ? chipActiveWide : chipWide}
+          >
+            <SlidersHorizontal size={16} />
+            <span>
+              Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+            </span>
+          </button>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortKey)}
+            style={sortSelect}
+          >
+            <option value="featured">Featured</option>
+            <option value="newest">Newest</option>
+            <option value="price-low">Price low to high</option>
+            <option value="price-high">Price high to low</option>
+          </select>
+        </div>
+
+        {filtersOpen ? (
+          <div style={filtersPanel}>
+            <div style={filterGroup}>
+              <div style={filterTitle}>Size</div>
+              <div style={rowWrap}>
+                {allSizes.map((size) => {
+                  const active = selectedSizes.includes(size)
+                  return (
+                    <button
+                      key={size}
+                      onClick={() => setSelectedSizes((prev) => toggleValue(prev, size))}
+                      style={active ? chipActiveSmall : chipSmall}
+                    >
+                      {size}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div style={filterGroup}>
+              <div style={filterTitle}>Color</div>
+              <div style={rowWrap}>
+                {allColors.map((color) => {
+                  const active = selectedColors.includes(color)
+                  return (
+                    <button
+                      key={color}
+                      onClick={() => setSelectedColors((prev) => toggleValue(prev, color))}
+                      style={active ? chipActiveSmall : chipSmall}
+                    >
+                      {color}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div style={filterGroup}>
+              <div style={filterTitle}>Price</div>
+              <div style={rowWrap}>
+                {[
+                  { key: "all", label: "All" },
+                  { key: "under-25", label: "Under $25" },
+                  { key: "25-50", label: "$25–$50" },
+                  { key: "over-50", label: "Over $50" },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setPriceFilter(item.key as typeof priceFilter)}
+                    style={priceFilter === item.key ? chipActiveSmall : chipSmall}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={filterGroup}>
+              <div style={filterTitle}>Availability</div>
+              <div style={rowWrap}>
+                {[
+                  { key: "all", label: "All" },
+                  { key: "in-stock", label: "In Stock" },
+                  { key: "low-stock", label: "Low Stock" },
+                  { key: "out-of-stock", label: "Out of Stock" },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() =>
+                      setAvailabilityFilter(item.key as typeof availabilityFilter)
+                    }
+                    style={availabilityFilter === item.key ? chipActiveSmall : chipSmall}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={clearFilters} style={clearFiltersBtn}>
+              Clear Filters
+            </button>
+          </div>
+        ) : null}
+
+        <div
+          style={{
+            color: GOLD,
+            fontSize: 14,
+            fontWeight: 900,
+            letterSpacing: 3,
+            textTransform: "uppercase",
+            marginBottom: 14,
+          }}
+        >
+          Merch Shop
+        </div>
+
+        <div style={categoriesScroll}>
+          {CATEGORY_LABELS.map((category) => (
+            <button
+              key={category.key}
+              onClick={() => setActiveCategory(category.key)}
+              style={activeCategory === category.key ? categoryChipActive : categoryChip}
+            >
+              {category.label}
+            </button>
+          ))}
+        </div>
+
+        {featuredProducts.length > 0 ? (
+          <div style={{ marginBottom: 24 }}>
+            <div style={sectionHeading}>
+              <span>Featured</span>
+              <div style={sectionHint}>
+                Curated picks <Sparkles size={14} />
+              </div>
+            </div>
+
+            <div style={featuredScroll}>
+              {featuredProducts.map((product) => (
+                <button
+                  key={product.id}
+                  onClick={() => openProduct(product)}
+                  style={featuredCard}
+                >
+                  <div style={featuredImageWrap}>
+                    <img
+                      src={product.images?.[0] || "/placeholder.svg"}
+                      alt={product.name}
+                      style={featuredImage}
+                    />
+                    <div style={featuredOverlay} />
+                    {getBadgeLabel(product) ? <Badge label={getBadgeLabel(product)} /> : null}
+                  </div>
+
+                  <div style={featuredBody}>
+                    <div style={featuredName}>{product.name}</div>
+                    <div style={featuredDesc}>{product.shortDescription}</div>
+                    <div style={featuredBottom}>
+                      <span style={featuredPrice}>${product.price}</span>
+                      <span style={featuredArrow}>
+                        View <ChevronRight size={14} />
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div ref={collectionRef}>
+          <div style={sectionHeading}>
+            <span>Collection</span>
+            <div style={sectionCount}>{filteredProducts.length} items</div>
+          </div>
+
+          {filteredProducts.length === 0 ? (
+            <div style={emptyWrap}>
+              <div style={emptyIcon}>✦</div>
+              <div style={emptyTitle}>No products found</div>
+              <div style={emptyText}>
+                Try another category, search term, or filter combination.
+              </div>
+              <button onClick={clearFilters} style={goShopBtn}>
+                Reset Filters
+              </button>
+            </div>
+          ) : (
+            <div style={productGrid}>
+              {filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  isFavorite={!!favorites[product.id]}
+                  onToggleFavorite={() => toggleFavorite(product.id)}
+                  onOpen={() => openProduct(product)}
+                  onQuickAdd={() => quickAddToCart(product)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <BottomNav />
+    </div>
+  )
+}
+
+const heroWrap = {
+  position: "relative" as const,
+  overflow: "hidden",
+  borderRadius: 28,
+  minHeight: 260,
+  marginBottom: 18,
+  border: "1px solid rgba(201,168,76,0.14)",
+  background:
+    "radial-gradient(circle at top left, rgba(201,168,76,0.22), transparent 32%), linear-gradient(135deg, #080808 0%, #111111 48%, #0a0a0a 100%)",
+}
+
+const heroOverlay = {
+  position: "absolute" as const,
+  inset: 0,
+  background:
+    "linear-gradient(110deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.0) 35%, rgba(201,168,76,0.06) 100%)",
+}
+
+const heroGlow = {
+  position: "absolute" as const,
+  right: -20,
+  top: -20,
+  width: 220,
+  height: 220,
+  borderRadius: "50%",
+  background: "radial-gradient(circle, rgba(201,168,76,0.18), transparent 65%)",
+  filter: "blur(8px)",
+}
+
+const heroContent = {
+  position: "relative" as const,
+  zIndex: 2,
+  padding: "24px 22px 26px",
+  maxWidth: 340,
+}
+
+const heroEyebrow = {
+  color: GOLD,
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: 3,
+  textTransform: "uppercase" as const,
+  marginBottom: 10,
+}
+
+const heroTitle = {
+  fontSize: 31,
+  fontWeight: 900,
+  lineHeight: 1.02,
+  letterSpacing: -0.6,
+  marginBottom: 12,
+}
+
+const heroText = {
+  color: "#d7d7d7",
+  fontSize: 14,
+  lineHeight: 1.55,
+  marginBottom: 18,
+  maxWidth: 280,
+}
+
+const heroBtn = {
+  padding: "12px 18px",
+  borderRadius: 999,
+  border: "none",
+  background: "linear-gradient(135deg,#C9A84C,#8B6914)",
+  color: "#000",
+  fontWeight: 900,
+  fontSize: 14,
+  cursor: "pointer",
+}
+
+const toolbarWrap = {
+  display: "grid",
+  gridTemplateColumns: "1fr auto",
+  gap: 10,
+  marginBottom: 12,
+}
+
+const searchWrap = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  borderRadius: 16,
+  padding: "13px 14px",
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+}
+
+const searchInput = {
+  flex: 1,
+  background: "transparent",
+  border: "none",
+  outline: "none",
+  color: "#fff",
+  fontSize: 14,
+}
+
+const clearSearchBtn = {
+  width: 26,
+  height: 26,
+  borderRadius: "50%",
+  border: "none",
+  background: "rgba(255,255,255,0.06)",
+  color: "#fff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+}
+
+const cartPillBtn = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "0 14px",
+  borderRadius: 16,
+  border: "1px solid rgba(255,255,255,0.08)",
+  background: CARD,
+  color: "#fff",
+  fontWeight: 800,
+  cursor: "pointer",
+}
+
+const cartCountBubble = {
+  minWidth: 20,
+  height: 20,
+  padding: "0 6px",
+  borderRadius: 999,
+  background: "linear-gradient(135deg,#C9A84C,#8B6914)",
+  color: "#000",
+  fontSize: 11,
+  fontWeight: 900,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+}
+
+const controlsRow = {
+  display: "grid",
+  gridTemplateColumns: "1fr 170px",
+  gap: 10,
+  marginBottom: 14,
+}
+
+const chipWide = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "transparent",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: 800,
+}
+
+const chipActiveWide = {
+  ...chipWide,
+  border: "1px solid rgba(201,168,76,0.45)",
+  background: "rgba(201,168,76,0.12)",
+  color: GOLD,
+}
+
+const sortSelect = {
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: CARD,
+  color: "#fff",
+  outline: "none",
+  cursor: "pointer",
+}
+
+const filtersPanel = {
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 22,
+  padding: "14px",
+  marginBottom: 18,
+}
+
+const filterGroup = {
+  marginBottom: 14,
+}
+
+const filterTitle = {
+  fontSize: 13,
+  fontWeight: 900,
+  color: GOLD,
+  letterSpacing: 1,
+  textTransform: "uppercase" as const,
+  marginBottom: 8,
+}
+const rowWrap = {
+  display: "flex",
+  flexWrap: "wrap" as const,
+  gap: 10,
+}
+const clearFiltersBtn = {
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "1px solid rgba(201,168,76,0.30)",
+  background: "transparent",
+  color: GOLD,
+  fontWeight: 900,
+  cursor: "pointer",
+}
+
+const categoriesScroll = {
+  display: "flex",
+  gap: 10,
+  overflowX: "auto" as const,
+  paddingBottom: 8,
+  marginBottom: 20,
+  scrollbarWidth: "none" as const,
+}
+
+const categoryChip = {
+  padding: "12px 16px",
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "transparent",
+  color: "#fff",
+  cursor: "pointer",
+  whiteSpace: "nowrap" as const,
+  fontWeight: 800,
+}
+
+const categoryChipActive = {
+  ...categoryChip,
+  border: "1px solid rgba(201,168,76,0.45)",
+  background: "rgba(201,168,76,0.12)",
+  color: GOLD,
+}
+
+const chipSmall = {
+  padding: "9px 12px",
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "transparent",
+  color: "#fff",
+  cursor: "pointer",
+  whiteSpace: "nowrap" as const,
+  fontSize: 13,
+}
+
+const chipActiveSmall = {
+  ...chipSmall,
+  border: "1px solid rgba(201,168,76,0.45)",
+  background: "rgba(201,168,76,0.12)",
+  color: GOLD,
+}
+
+const sectionHeading = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 12,
+  fontSize: 22,
+  fontWeight: 900,
+}
+
+const sectionHint = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  color: GOLD,
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: 1,
+  textTransform: "uppercase" as const,
+}
+
+const sectionCount = {
+  color: "#a9a9a9",
+  fontSize: 13,
+  fontWeight: 700,
+}
+
+const featuredScroll = {
+  display: "flex",
+  gap: 14,
+  overflowX: "auto" as const,
+  paddingBottom: 6,
+  marginBottom: 24,
+  scrollbarWidth: "none" as const,
+}
+
+const featuredCard = {
+  minWidth: 250,
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 24,
+  overflow: "hidden",
+  color: "#fff",
+  cursor: "pointer",
+  textAlign: "left" as const,
+}
+
+const featuredImageWrap = {
+  position: "relative" as const,
+  height: 220,
+  overflow: "hidden",
+}
+
+const featuredImage = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover" as const,
+  display: "block",
+}
+
+const featuredOverlay = {
+  position: "absolute" as const,
+  inset: 0,
+  background: "linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.28) 100%)",
+}
+
+const featuredBody = {
+  padding: "14px 14px 16px",
+}
+
+const featuredName = {
+  fontSize: 20,
+  fontWeight: 900,
+  marginBottom: 8,
+  lineHeight: 1.1,
+}
+
+const featuredDesc = {
+  color: "#b9b9b9",
+  fontSize: 13,
+  lineHeight: 1.5,
+  minHeight: 40,
+  marginBottom: 12,
+}
+
+const featuredBottom = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+}
+
+const featuredPrice = {
+  color: GOLD,
+  fontSize: 24,
+  fontWeight: 900,
+}
+
+const featuredArrow = {
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  color: "#ddd",
+  fontSize: 13,
+  fontWeight: 800,
+}
+
+const productGrid = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 14,
+}
+
+const productCard = {
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 22,
+  overflow: "hidden",
+  boxShadow: "0 10px 24px rgba(0,0,0,0.22)",
+}
+
+const imageHitArea = {
+  position: "relative" as const,
+  height: 210,
+  overflow: "hidden",
+  cursor: "pointer",
+}
+
+const productImage = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover" as const,
+  display: "block",
+}
+
+const imageOverlay = {
+  position: "absolute" as const,
+  inset: 0,
+  background: "linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.28) 100%)",
+}
+
+const badgeStyle = {
+  position: "absolute" as const,
+  top: 10,
+  left: 10,
+  padding: "6px 10px",
+  borderRadius: 999,
+  background: "rgba(201,168,76,0.92)",
+  color: "#000",
+  fontSize: 11,
+  fontWeight: 900,
+  zIndex: 2,
+}
+
+const favoriteBtn = {
+  position: "absolute" as const,
+  top: 10,
+  right: 10,
+  width: 34,
+  height: 34,
+  borderRadius: "50%",
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(15,15,15,0.82)",
+  color: "#fff",
+  fontSize: 16,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  zIndex: 2,
+}
+
+const tapToViewWrap = {
+  position: "absolute" as const,
+  left: 10,
+  right: 10,
+  bottom: 10,
+  display: "flex",
+  justifyContent: "center",
+}
+
+const tapToViewText = {
+  padding: "7px 12px",
+  borderRadius: 999,
+  background: "rgba(201,168,76,0.94)",
+  color: "#000",
+  fontWeight: 900,
+  fontSize: 11,
+  letterSpacing: 0.4,
+}
+
+const cardBody = {
+  padding: "12px 12px 14px",
+}
+
+const productName = {
+  fontSize: 17,
+  fontWeight: 900,
+  lineHeight: 1.15,
+  marginBottom: 8,
+  minHeight: 40,
+}
+
+const productDesc = {
+  color: "#a9a9a9",
+  fontSize: 12,
+  lineHeight: 1.45,
+  minHeight: 36,
+  marginBottom: 10,
+}
+
+const metaRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 10,
+  marginBottom: 8,
+}
+
+const priceWrap = {
+  display: "flex",
+  alignItems: "baseline",
+  gap: 6,
+  flexWrap: "wrap" as const,
+}
+
+const priceText = {
+  color: GOLD,
+  fontWeight: 900,
+  fontSize: 18,
+}
+
+const compareAtText = {
+  color: "#777",
+  fontSize: 12,
+  textDecoration: "line-through",
+}
+
+const stockText = {
+  color: "#8f8f8f",
+  fontSize: 11,
+  textAlign: "right" as const,
+}
+
+const sizesLine = {
+  color: "#868686",
+  fontSize: 11,
+  marginBottom: 12,
+}
+
+const addCartBtn = {
+  width: "100%",
+  padding: "11px 12px",
+  borderRadius: 14,
+  border: "none",
+  background: "linear-gradient(135deg,#C9A84C,#8B6914)",
+  color: "#000",
+  fontWeight: 900,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 7,
+}
+
+const emptyWrap = {
+  marginTop: 10,
+  textAlign: "center" as const,
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 24,
+  padding: "34px 20px",
+}
+
+const emptyIcon = {
+  fontSize: 30,
+  marginBottom: 10,
+  color: GOLD,
+}
+
+const emptyTitle = {
+  fontSize: 22,
+  fontWeight: 900,
+  marginBottom: 8,
+}
+
+const emptyText = {
+  color: "#b8b8b8",
+  fontSize: 14,
+  lineHeight: 1.5,
+  marginBottom: 18,
+}
+
+const goShopBtn = {
+  padding: "13px 18px",
+  borderRadius: 14,
+  border: "none",
+  background: "linear-gradient(135deg,#C9A84C,#8B6914)",
+  color: "#000",
+  fontWeight: 900,
+  cursor: "pointer",
+}

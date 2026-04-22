@@ -1,0 +1,748 @@
+"use client"
+
+import { useMemo, useState } from "react"
+import {
+  Bookmark,
+  ChevronLeft,
+  ChevronRight,
+  Minus,
+  Plus,
+  ShoppingBag,
+} from "lucide-react"
+import { useApp, ProductType } from "@/lib/app-context"
+import { TopHeader } from "@/components/navigation/top-header"
+
+const GOLD = "#C9A84C"
+const DARK = "#0A0A0A"
+const CARD = "#121212"
+
+type EnhancedProduct = ProductType & {
+  compareAtPrice?: number
+  gender?: "male" | "female" | "unisex"
+  material?: string
+  fit?: string
+  care?: string
+  shippingNote?: string
+  availability?: "in-stock" | "low-stock" | "out-of-stock"
+  featured?: boolean
+  isNew?: boolean
+  isBestSeller?: boolean
+  isLimited?: boolean
+  sortOrder?: number
+  lifestyleImages?: string[]
+}
+
+function getBadgeLabel(product: EnhancedProduct) {
+  if (product.badge) return product.badge
+  if (product.isBestSeller) return "Best Seller"
+  if (product.isNew) return "New"
+  if (product.isLimited) return "Limited"
+  return ""
+}
+
+function getAvailabilityLabel(product: EnhancedProduct) {
+  if (product.availability === "out-of-stock") return "Out of Stock"
+  if (product.availability === "low-stock") return "Low Stock"
+  return "In Stock"
+}
+
+function normalizeProduct(product: ProductType | null): EnhancedProduct | null {
+  if (!product) return null
+
+  const stock = typeof product.stock === "number" ? product.stock : 12
+  const availability: EnhancedProduct["availability"] =
+    stock <= 0 ? "out-of-stock" : stock <= 8 ? "low-stock" : "in-stock"
+
+  const images =
+    product.images && product.images.length > 0
+      ? product.images
+      : [product.image || "/placeholder.svg"]
+
+  return {
+    ...product,
+    images,
+    compareAtPrice:
+      product.price >= 50 ? Number((product.price * 1.18).toFixed(0)) : undefined,
+    material: "Premium signature finish",
+    fit: "True to size",
+    care: "Refer to care instructions",
+    shippingNote: "Ships in 2–4 business days",
+    availability,
+    gender: "unisex",
+    lifestyleImages: [],
+  }
+}
+
+export function ProductDetailScreen() {
+  const {
+    selectedProduct,
+    products,
+    goBack,
+    addToCart,
+    setCurrentScreen,
+    setSelectedProduct,
+  } = useApp()
+
+  const product = useMemo(
+    () => normalizeProduct(selectedProduct),
+    [selectedProduct]
+  )
+
+  const [imageIndex, setImageIndex] = useState(0)
+  const [favorite, setFavorite] = useState(false)
+  const [selectedSize, setSelectedSize] = useState("")
+  const [selectedColor, setSelectedColor] = useState("")
+  const [quantity, setQuantity] = useState(1)
+  const [addedFlash, setAddedFlash] = useState(false)
+
+  const galleryImages = useMemo(() => {
+    if (!product) return ["/placeholder.svg"]
+    const base = product.images && product.images.length > 0 ? product.images : ["/placeholder.svg"]
+    const lifestyle = product.lifestyleImages || []
+    const merged = [...base, ...lifestyle]
+    return merged.length > 0 ? merged.slice(0, 6) : ["/placeholder.svg"]
+  }, [product])
+
+  const relatedProducts = useMemo(() => {
+    if (!product) return []
+    return products
+      .filter((item) => item.id !== product.id)
+      .filter((item) => (item.category || "") === (product.category || ""))
+      .slice(0, 4)
+  }, [products, product])
+
+  if (!product) return null
+
+  const nextImage = () => {
+    setImageIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1))
+  }
+
+  const previousImage = () => {
+    setImageIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1))
+  }
+
+  const handleAddToCart = () => {
+    const size = selectedSize || product.sizes?.[0] || "One Size"
+    const color = selectedColor || product.colors?.[0] || "Default"
+
+    addToCart({
+      product,
+      size,
+      color,
+      quantity,
+    })
+
+    setAddedFlash(true)
+    setTimeout(() => {
+      setAddedFlash(false)
+      setCurrentScreen("cart")
+    }, 700)
+  }
+
+  const badge = getBadgeLabel(product)
+  const outOfStock = product.availability === "out-of-stock"
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: DARK,
+        color: "#fff",
+        paddingBottom: 120,
+      }}
+    >
+      <TopHeader title="Product" />
+
+      <div style={{ padding: "12px 16px 0" }}>
+        <button onClick={goBack} style={backBtn}>
+          ← Back
+        </button>
+      </div>
+
+      <div style={heroWrap}>
+        <img
+          src={galleryImages[imageIndex]}
+          alt={product.name}
+          style={heroImage}
+        />
+
+        <div style={heroOverlay} />
+
+        <button onClick={() => setFavorite(!favorite)} style={favoriteBtn}>
+          <Bookmark
+            size={20}
+            fill={favorite ? GOLD : "transparent"}
+            color={favorite ? GOLD : "#fff"}
+          />
+        </button>
+
+        {badge ? <div style={badgeStyle}>{badge}</div> : null}
+
+        {galleryImages.length > 1 && (
+          <>
+            <button onClick={previousImage} style={{ ...navBtn, left: 16 }}>
+              <ChevronLeft size={24} />
+            </button>
+
+            <button onClick={nextImage} style={{ ...navBtn, right: 16 }}>
+              <ChevronRight size={24} />
+            </button>
+          </>
+        )}
+      </div>
+
+      <div style={{ padding: "0 16px" }}>
+        <div style={dotsWrap}>
+          {galleryImages.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setImageIndex(index)}
+              style={{
+                ...dotBase,
+                width: imageIndex === index ? 24 : 8,
+                background:
+                  imageIndex === index ? GOLD : "rgba(255,255,255,0.22)",
+              }}
+            />
+          ))}
+        </div>
+
+        <div style={imageCountText}>
+          {imageIndex + 1}/{galleryImages.length}
+        </div>
+
+        <div style={headerRow}>
+          <div style={{ flex: 1 }}>
+            <div style={productName}>{product.name}</div>
+            <div style={stockRow}>
+              <span style={stockBadge}>{getAvailabilityLabel(product)}</span>
+            </div>
+          </div>
+
+          <div style={priceBlock}>
+            <div style={priceText}>${product.price}</div>
+            {product.compareAtPrice ? (
+              <div style={compareText}>${product.compareAtPrice}</div>
+            ) : null}
+          </div>
+        </div>
+
+        <div style={descriptionLead}>
+          {product.shortDescription || "Premium Sin Vergüenza merch with elevated black-and-gold identity."}
+        </div>
+
+        {product.sizes?.length ? (
+          <div style={sectionCard}>
+            <div style={sectionTitle}>Select Size</div>
+            <div style={rowWrap}>
+              {product.sizes.map((size) => (
+                <button
+                  key={size}
+                  onClick={() => setSelectedSize(size)}
+                  style={selectedSize === size ? chipActive : chip}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {product.colors?.length ? (
+          <div style={sectionCard}>
+            <div style={sectionTitle}>Select Color</div>
+            <div style={rowWrap}>
+              {product.colors.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setSelectedColor(color)}
+                  style={selectedColor === color ? chipActive : chip}
+                >
+                  {color}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div style={sectionCard}>
+          <div style={sectionTitle}>Quantity</div>
+          <div style={qtyRow}>
+            <button
+              onClick={() => setQuantity((prev) => (prev > 1 ? prev - 1 : 1))}
+              style={qtyBtn}
+            >
+              <Minus size={18} />
+            </button>
+
+            <div style={qtyValue}>{quantity}</div>
+
+            <button
+              onClick={() => setQuantity((prev) => prev + 1)}
+              style={qtyBtn}
+            >
+              <Plus size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div style={infoGrid}>
+          <div style={infoCard}>
+            <div style={infoLabel}>Material</div>
+            <div style={infoValue}>{product.material || "Premium signature finish"}</div>
+          </div>
+
+          <div style={infoCard}>
+            <div style={infoLabel}>Fit</div>
+            <div style={infoValue}>{product.fit || "True to size"}</div>
+          </div>
+
+          <div style={infoCard}>
+            <div style={infoLabel}>Care</div>
+            <div style={infoValue}>{product.care || "Refer to care instructions"}</div>
+          </div>
+
+          <div style={infoCard}>
+            <div style={infoLabel}>Shipping</div>
+            <div style={infoValue}>{product.shippingNote || "Ships in 2–4 business days"}</div>
+          </div>
+        </div>
+
+        <div style={descriptionCard}>
+          <div style={detailHeading}>Product Details</div>
+          <div style={detailText}>
+            {product.description ||
+              "Premium Sin Vergüenza merch built with a clean, elevated visual identity that feels more like a lifestyle brand than basic merch."}
+          </div>
+        </div>
+
+        {relatedProducts.length > 0 ? (
+          <div style={{ marginBottom: 18 }}>
+            <div style={relatedHeading}>You may also like</div>
+
+            <div style={relatedScroll}>
+              {relatedProducts.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setSelectedProduct(item)
+                    setImageIndex(0)
+                    setSelectedSize("")
+                    setSelectedColor("")
+                    setQuantity(1)
+                    setFavorite(false)
+                  }}
+                  style={relatedCard}
+                >
+                  <img
+                    src={item.images?.[0] || item.image || "/placeholder.svg"}
+                    alt={item.name}
+                    style={relatedImage}
+                  />
+                  <div style={relatedBody}>
+                    <div style={relatedName}>{item.name}</div>
+                    <div style={relatedPrice}>${item.price}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div style={stickyFooter}>
+        <div style={footerPriceWrap}>
+          <div style={footerPriceLabel}>Total</div>
+          <div style={footerPriceValue}>${product.price * quantity}</div>
+        </div>
+
+        <button
+          onClick={handleAddToCart}
+          disabled={outOfStock}
+          style={{
+            ...addToCartBtn,
+            opacity: outOfStock ? 0.45 : 1,
+            cursor: outOfStock ? "not-allowed" : "pointer",
+          }}
+        >
+          <ShoppingBag size={18} />
+          <span>
+            {outOfStock
+              ? "Unavailable"
+              : addedFlash
+              ? "Added to Cart"
+              : "Add to Cart"}
+          </span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const backBtn = {
+  background: "transparent",
+  border: "none",
+  color: "#fff",
+  fontSize: 15,
+  cursor: "pointer",
+}
+
+const heroWrap = {
+  position: "relative" as const,
+  height: 390,
+  overflow: "hidden",
+  marginBottom: 16,
+  background: "#171717",
+}
+
+const heroImage = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover" as const,
+  display: "block",
+}
+
+const heroOverlay = {
+  position: "absolute" as const,
+  inset: 0,
+  background: "linear-gradient(180deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.30) 100%)",
+}
+
+const favoriteBtn = {
+  position: "absolute" as const,
+  top: 16,
+  right: 16,
+  width: 46,
+  height: 46,
+  borderRadius: "50%",
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(25,25,25,0.88)",
+  color: "#fff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  zIndex: 3,
+}
+
+const badgeStyle = {
+  position: "absolute" as const,
+  top: 16,
+  left: 16,
+  padding: "7px 12px",
+  borderRadius: 999,
+  background: "rgba(201,168,76,0.94)",
+  color: "#000",
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: 0.5,
+  zIndex: 3,
+}
+
+const navBtn = {
+  position: "absolute" as const,
+  top: "50%",
+  transform: "translateY(-50%)",
+  width: 46,
+  height: 46,
+  borderRadius: "50%",
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(25,25,25,0.88)",
+  color: "#fff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  zIndex: 3,
+}
+
+const dotsWrap = {
+  display: "flex",
+  justifyContent: "center",
+  gap: 8,
+  marginBottom: 12,
+}
+
+const dotBase = {
+  height: 8,
+  borderRadius: 999,
+  border: "none",
+  cursor: "pointer",
+  transition: "all 0.2s ease",
+}
+
+const imageCountText = {
+  textAlign: "center" as const,
+  color: "#bdbdbd",
+  fontSize: 13,
+  marginBottom: 18,
+}
+
+const headerRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: 12,
+  marginBottom: 12,
+}
+
+const productName = {
+  fontSize: 30,
+  fontWeight: 900,
+  lineHeight: 1.06,
+  letterSpacing: -0.6,
+  marginBottom: 8,
+}
+
+const stockRow = {
+  display: "flex",
+  gap: 8,
+  alignItems: "center",
+}
+
+const stockBadge = {
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "6px 10px",
+  borderRadius: 999,
+  background: "rgba(201,168,76,0.12)",
+  border: "1px solid rgba(201,168,76,0.30)",
+  color: GOLD,
+  fontSize: 12,
+  fontWeight: 800,
+}
+
+const priceBlock = {
+  textAlign: "right" as const,
+  minWidth: 86,
+}
+
+const priceText = {
+  color: GOLD,
+  fontSize: 28,
+  fontWeight: 900,
+  lineHeight: 1.1,
+}
+
+const compareText = {
+  color: "#7c7c7c",
+  fontSize: 13,
+  textDecoration: "line-through",
+  marginTop: 4,
+}
+
+const descriptionLead = {
+  color: "#d1d1d1",
+  fontSize: 15,
+  lineHeight: 1.6,
+  marginBottom: 16,
+}
+
+const sectionCard = {
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 22,
+  padding: "15px 14px",
+  marginBottom: 14,
+}
+
+const sectionTitle = {
+  fontSize: 15,
+  fontWeight: 800,
+  marginBottom: 10,
+}
+
+const rowWrap = {
+  display: "flex",
+  flexWrap: "wrap" as const,
+  gap: 10,
+}
+
+const chip = {
+  padding: "10px 14px",
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "transparent",
+  color: "#fff",
+  cursor: "pointer",
+}
+
+const chipActive = {
+  padding: "10px 14px",
+  borderRadius: 999,
+  border: "1px solid rgba(201,168,76,0.45)",
+  background: "rgba(201,168,76,0.12)",
+  color: GOLD,
+  cursor: "pointer",
+}
+
+const qtyRow = {
+  display: "flex",
+  alignItems: "center",
+  gap: 14,
+}
+
+const qtyBtn = {
+  width: 42,
+  height: 42,
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "rgba(255,255,255,0.03)",
+  color: "#fff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+}
+
+const qtyValue = {
+  fontSize: 18,
+  fontWeight: 800,
+  minWidth: 26,
+  textAlign: "center" as const,
+}
+
+const infoGrid = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 12,
+  marginBottom: 14,
+}
+
+const infoCard = {
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 18,
+  padding: "14px",
+}
+
+const infoLabel = {
+  color: GOLD,
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: 1,
+  textTransform: "uppercase" as const,
+  marginBottom: 8,
+}
+
+const infoValue = {
+  color: "#dfdfdf",
+  fontSize: 13,
+  lineHeight: 1.45,
+}
+
+const descriptionCard = {
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 22,
+  padding: "16px",
+  marginBottom: 18,
+}
+
+const detailHeading = {
+  fontSize: 16,
+  fontWeight: 800,
+  marginBottom: 10,
+}
+
+const detailText = {
+  color: "#e7e7e7",
+  fontSize: 15,
+  lineHeight: 1.62,
+}
+
+const relatedHeading = {
+  fontSize: 18,
+  fontWeight: 900,
+  marginBottom: 12,
+}
+
+const relatedScroll = {
+  display: "flex",
+  gap: 12,
+  overflowX: "auto" as const,
+  paddingBottom: 6,
+  scrollbarWidth: "none" as const,
+}
+
+const relatedCard = {
+  minWidth: 150,
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 18,
+  overflow: "hidden",
+  color: "#fff",
+  cursor: "pointer",
+  textAlign: "left" as const,
+}
+
+const relatedImage = {
+  width: "100%",
+  height: 150,
+  objectFit: "cover" as const,
+  display: "block",
+}
+
+const relatedBody = {
+  padding: "10px 10px 12px",
+}
+
+const relatedName = {
+  fontSize: 13,
+  fontWeight: 800,
+  lineHeight: 1.25,
+  marginBottom: 6,
+  minHeight: 32,
+}
+
+const relatedPrice = {
+  color: GOLD,
+  fontWeight: 900,
+  fontSize: 15,
+}
+
+const stickyFooter = {
+  position: "fixed" as const,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  background: "rgba(10,10,10,0.94)",
+  backdropFilter: "blur(14px)",
+  borderTop: "1px solid rgba(255,255,255,0.08)",
+  padding: "14px 16px 18px",
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+}
+
+const footerPriceWrap = {
+  minWidth: 84,
+}
+
+const footerPriceLabel = {
+  color: "#9a9a9a",
+  fontSize: 12,
+  marginBottom: 4,
+}
+
+const footerPriceValue = {
+  color: "#fff",
+  fontSize: 20,
+  fontWeight: 900,
+}
+
+const addToCartBtn = {
+  flex: 1,
+  padding: "15px 18px",
+  borderRadius: 16,
+  border: "none",
+  background: "linear-gradient(135deg,#C9A84C,#8B6914)",
+  color: "#000",
+  fontWeight: 900,
+  fontSize: 15,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+}

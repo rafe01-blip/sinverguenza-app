@@ -1,0 +1,98 @@
+"use client"
+
+import { useApp } from "@/lib/app-context"
+import { Home, CalendarDays, ShoppingBag, Users, Flame } from "lucide-react"
+
+type ScreenType = Parameters<ReturnType<typeof useApp>["setCurrentScreen"]>[0]
+
+type NavItem = {
+  id: string
+  label: string
+  icon: React.ReactNode
+  screen: ScreenType
+}
+
+const navItems: NavItem[] = [
+  { id: "home", label: "Home", icon: <Home className="h-5 w-5" />, screen: "home" },
+  { id: "calendar", label: "Calendar", icon: <CalendarDays className="h-5 w-5" />, screen: "calendar" },
+  { id: "store", label: "Store", icon: <ShoppingBag className="h-5 w-5" />, screen: "shop" },
+  { id: "community", label: "Community", icon: <Users className="h-5 w-5" />, screen: "community" },
+  { id: "more", label: "More", icon: <Flame className="h-5 w-5" />, screen: "more" },
+]
+
+export function BottomNav() {
+  const { currentScreen, setCurrentScreen } = useApp()
+
+  const isActive = (screen: ScreenType) => {
+    if (screen === "shop") {
+      return ["shop", "cart", "checkout", "product-detail"].includes(currentScreen)
+    }
+
+    if (screen === "more") {
+      return ["more"].includes(currentScreen)
+    }
+
+    if (screen === "community") {
+      return ["community", "creator-profile", "creator-list", "followers-list"].includes(currentScreen)
+    }
+
+    return currentScreen === screen
+  }
+
+  return (
+    <nav
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#0a0a0a]/96 backdrop-blur-xl supports-[backdrop-filter]:bg-[#0a0a0a]/88"
+      style={{
+        paddingBottom: "max(env(safe-area-inset-bottom), 4px)",
+        boxShadow:
+          "0 -10px 26px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.03)",
+      }}
+    >
+      <div className="mx-auto flex h-[66px] max-w-5xl items-center justify-around px-2">
+        {navItems.map((item) => {
+          const active = isActive(item.screen)
+
+          return (
+            <button
+              key={item.id}
+              onClick={() => setCurrentScreen(item.screen)}
+              className={`flex flex-col items-center justify-center gap-[3px] px-3 py-1.5 transition-all active:scale-95 ${
+                item.id === "store" ? "relative -mt-3" : ""
+              }`}
+              aria-label={item.label}
+            >
+              {item.id === "store" ? (
+                <>
+                  <div className="relative flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <div className="absolute inset-[-6px] scale-110 rounded-full bg-primary opacity-35 blur-[18px]" />
+                    <div className="relative z-10 flex h-11 w-11 items-center justify-center rounded-full bg-primary shadow-[0_0_18px_rgba(212,175,55,0.32)]">
+                      {item.icon}
+                    </div>
+                  </div>
+
+                  <span className="text-[10px] font-medium leading-none text-primary">
+                    {item.label}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className={active ? "text-primary" : "text-muted-foreground"}>
+                    {item.icon}
+                  </span>
+
+                  <span
+                    className={`text-[10px] leading-none ${
+                      active ? "font-medium text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+                </>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}

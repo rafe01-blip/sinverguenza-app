@@ -1,1 +1,152 @@
-functio
+"use client"
+
+import { useEffect, useMemo, useRef, useState } from "react"
+import { AppProvider, useApp } from "../lib/app-context"
+
+import { LoadingScreen } from "../components/screens/loading-screen"
+import { LandingScreen } from "../components/screens/landing-screen"
+import { LoginScreen } from "../components/screens/login-screen"
+import { SignupScreen } from "../components/screens/signup-screen"
+import { HomeScreen } from "../components/screens/home-screen"
+import { CalendarScreen } from "../components/screens/calendar-screen"
+import { CreateEventScreen } from "../components/screens/create-event-screen"
+import { EventDetailScreen } from "../components/screens/event-detail-screen"
+import { CommunityScreen } from "../components/screens/community-screen"
+import { SpacesScreen } from "../components/screens/SpacesScreen"
+import { SpaceScreen } from "../components/screens/SpaceScreen"
+import { CreatorProfileScreen } from "../components/screens/creator-profile-screen"
+import { CreatorListScreen } from "../components/screens/creator-list-screen"
+import { StoryViewerScreen } from "../components/screens/story-viewer-screen"
+import { FollowersListScreen } from "../components/screens/followers-list-screen"
+import { ProfileScreen } from "../components/screens/profile-screen"
+import { SettingsScreen } from "../components/screens/settings-screen"
+import { NotificationsScreen } from "../components/screens/notifications-screen"
+import { ShopScreen } from "../components/screens/shop-screen"
+import { ProductDetailScreen } from "../components/screens/product-detail-screen"
+import { CartScreen } from "../components/screens/cart-screen"
+import { CheckoutScreen } from "../components/screens/checkout-screen"
+import { MoreScreen } from "../components/screens/more-screen"
+
+type ScreenKey =
+  | "loading"
+  | "landing"
+  | "login"
+  | "signup"
+  | "home"
+  | "calendar"
+  | "create-event"
+  | "event-detail"
+  | "community"
+  | "spaces"
+  | "space"
+  | "story-viewer"
+  | "creator-profile"
+  | "creator-list"
+  | "followers-list"
+  | "profile"
+  | "settings"
+  | "notifications"
+  | "shop"
+  | "product-detail"
+  | "cart"
+  | "checkout"
+  | "more"
+
+function renderScreen(screen: ScreenKey) {
+  switch (screen) {
+    case "loading":
+      return <LoadingScreen />
+    case "landing":
+      return <LandingScreen />
+    case "login":
+      return <LoginScreen />
+    case "signup":
+      return <SignupScreen />
+    case "home":
+      return <HomeScreen />
+    case "calendar":
+      return <CalendarScreen />
+    case "create-event":
+      return <CreateEventScreen />
+    case "event-detail":
+      return <EventDetailScreen />
+    case "community":
+      return <CommunityScreen />
+    case "spaces":
+      return <SpacesScreen />
+    case "space":
+      return <SpaceScreen />
+    case "story-viewer":
+      return <StoryViewerScreen />
+    case "creator-profile":
+      return <CreatorProfileScreen />
+    case "creator-list":
+      return <CreatorListScreen />
+    case "followers-list":
+      return <FollowersListScreen />
+    case "profile":
+      return <ProfileScreen />
+    case "settings":
+      return <SettingsScreen />
+    case "notifications":
+      return <NotificationsScreen />
+    case "shop":
+      return <ShopScreen />
+    case "product-detail":
+      return <ProductDetailScreen />
+    case "cart":
+      return <CartScreen />
+    case "checkout":
+      return <CheckoutScreen />
+    case "more":
+      return <MoreScreen />
+    default:
+      return <LandingScreen />
+  }
+}
+
+function ScreenRenderer() {
+  const { currentScreen } = useApp()
+  const current = currentScreen as ScreenKey
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        background: "#0A0A0A",
+      }}
+    >
+      <div
+        key={current}
+        style={{
+          width: "100%",
+          height: "100%",
+          animation: "sv-screen-in 180ms ease-out",
+        }}
+      >
+        {renderScreen(current)}
+      </div>
+
+      <style jsx global>{`
+        @keyframes sv-screen-in {
+          0% {
+            opacity: 0;
+            transform: translateY(4px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+    </div>
+  )
+}
+export default function Page() {
+  return (
+    <AppProvider>
+      <ScreenRenderer />
+    </AppProvider>
+  )
+}

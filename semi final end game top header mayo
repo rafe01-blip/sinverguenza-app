@@ -1,0 +1,93 @@
+"use client"
+
+import { useApp } from "@/lib/app-context"
+import { Bell, ShoppingBag, User, ArrowLeft } from "lucide-react"
+
+interface TopHeaderProps {
+  title?: string
+  showProfile?: boolean
+  showBack?: boolean
+  onBack?: () => void
+  goToScreenOnTitleClick?: "home" | "calendar" | "community" | "profile" | "more"
+}
+
+export function TopHeader({
+  title = "Home",
+  showProfile = true,
+  showBack = false,
+  onBack,
+  goToScreenOnTitleClick = "home",
+}: TopHeaderProps) {
+  const { setCurrentScreen, cartItems } = useApp()
+
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+
+  return (
+<header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-xl">
+      <div className="mx-auto flex h-[78px] max-w-5xl items-center justify-between px-4">
+        <div className="flex items-center gap-3 min-w-0">
+          {showBack && (
+            <button
+              onClick={onBack}
+              className="shrink-0 rounded-full p-2 hover:bg-secondary"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="h-5 w-5 text-foreground" />
+            </button>
+          )}
+
+          <button
+            onClick={() => setCurrentScreen(goToScreenOnTitleClick)}
+            className="flex items-center gap-3 text-left min-w-0"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-primary/35 bg-card shadow-[0_0_20px_rgba(212,175,55,0.08)]">
+              <span className="font-serif text-xl font-bold text-primary">SV</span>
+            </div>
+
+            <div className="min-w-0 leading-none">
+              <p className="mb-1 text-[11px] font-medium tracking-[0.22em] text-primary/90 uppercase">
+                Sin Vergüenza
+              </p>
+              <h1 className="text-[16px] font-medium text-foreground">
+                {title}
+              </h1>
+            </div>
+          </button>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={() => setCurrentScreen("notifications")}
+            className="relative rounded-full p-2 hover:bg-secondary"
+            aria-label="Notifications"
+          >
+            <Bell className="h-6 w-6 text-muted-foreground" />
+            <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-primary" />
+          </button>
+
+          <button
+            onClick={() => setCurrentScreen("cart")}
+            className="relative rounded-full p-2 hover:bg-secondary"
+            aria-label="Cart"
+          >
+            <ShoppingBag className="h-6 w-6 text-muted-foreground" />
+            {cartCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-black">
+                {cartCount}
+              </span>
+            )}
+          </button>
+
+          {showProfile && (
+            <button
+              onClick={() => setCurrentScreen("profile")}
+              className="rounded-full p-2 hover:bg-secondary"
+              aria-label="Profile"
+            >
+              <User className="h-6 w-6 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+      </div>
+    </header>
+  )
+}

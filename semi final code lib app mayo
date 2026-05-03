@@ -1,0 +1,3529 @@
+"use client"
+
+import React, { createContext, useContext, useMemo, useState } from "react"
+
+/* =========================
+   SCREEN / NAVIGATION TYPES
+========================= */
+
+export type Screen =
+  | "loading"
+  | "landing"
+  | "login"
+  | "signup"
+  | "home"
+  | "calendar"
+  | "create-event"
+  | "event-detail"
+  | "community"
+  | "spaces"
+  | "space"
+  | "create-space"
+  | "story-viewer"
+  | "creator-profile"
+  | "creator-list"
+  | "followers-list"
+  | "profile"
+  | "settings"
+  | "notifications"
+  | "shop"
+  | "product-detail"
+  | "cart"
+  | "checkout"
+  | "more"
+
+export type CreatorBadgeLabel = "Official" | "Instructor" | "Host" | "Member"
+export type CreatorRole = "official" | "instructor" | "host" | "member"
+
+export type MediaType = "image" | "video"
+
+export interface MediaItem {
+  id: string
+  type: MediaType
+  url: string
+  thumbnailUrl?: string
+  alt?: string
+  durationSeconds?: number
+}
+
+/* =========================
+   COMMUNITY / STORY TYPES
+========================= */
+
+export type CommunityPostType = "post" | "poll" | "video"
+export type CommunityStoryType = "story" | "video"
+export type StoryViewMode = "internal" | "instagram"
+export type StoryAudience = "public" | "followers" | "both"
+
+export type StoryReaction =
+  | "❤️"
+  | "🔥"
+  | "👏"
+  | "🕺🏾"
+  | "💃"
+  | "😎"
+  | "🤣"
+
+/* =========================
+   CALENDAR / EVENT TYPES
+========================= */
+
+export type CalendarEntryMode = "expand" | "focus"
+
+export type CalendarEntrySource =
+  | "home-pinned"
+  | "home-date"
+  | "calendar"
+  | "event-detail"
+
+export type EventAttendanceStatus = "going" | "cant-go" | null
+
+export type EventAudienceTag =
+  | "dance"
+  | "workshop"
+  | "free"
+  | "paid"
+  | "public"
+  | "private"
+  | "off-campus"
+  | "individual"
+  | "gaming"
+  | "sports"
+  | "social"
+  | "family"
+  | "food"
+  | "networking"
+  | "party"
+  | "culture"
+  | "music"
+  | "outdoor"
+  | "class"
+/* =========================
+   SPACE TYPES
+========================= */
+
+export type SpaceKey =
+  | "dance"
+  | "workshop"
+  | "free"
+  | "paid"
+  | "public"
+  | "private"
+  | "off-campus"
+  | "individual"
+  | "general"
+  | "music"
+  | "events"
+  | "opportunities"
+  | "gaming"
+  | "social"
+  | "fitness"
+
+export type SpaceVisibility = "public" | "private"
+export type SpaceRequestStatus = "none" | "pending" | "approved"
+export type SpaceFreshness = "new" | "active" | "quiet" | "expired"
+
+export interface SpaceLimitInfo {
+  createdEvents: number
+  createdSpaces: number
+  maxSpacesAllowed: number
+  remainingSpaces: number
+  canCreateMore: boolean
+  nextUnlockMessage: string
+}
+
+export interface SpaceType {
+  key: SpaceKey
+  label: string
+  emoji: string
+  description: string
+
+  membersCount: number
+  topicsCount: number
+
+  isJoined: boolean
+
+  visibility: SpaceVisibility
+  requestStatus: SpaceRequestStatus
+
+  linkedEventId?: string
+  expiresAt?: string
+  createdAt?: string
+  freshness?: SpaceFreshness
+}
+
+/* =========================
+   NOTIFICATION TYPES
+========================= */
+
+export type NotificationType =
+  | "events"
+  | "community"
+  | "creators"
+  | "store"
+  | "spaces"
+
+export type NotificationTargetType =
+  | "event"
+  | "community-post"
+  | "creator"
+  | "product"
+  | "space"
+  | "event-thread"
+
+export interface NotificationItem {
+  id: string
+  type: NotificationType
+  title: string
+  message: string
+  createdAt: string
+  isRead: boolean
+  targetType?: NotificationTargetType
+  targetId?: string
+  image?: string
+}
+
+/* =========================
+   SOCIAL / USER TYPES
+========================= */
+
+export interface SocialLinks {
+  instagram?: string
+  tiktok?: string
+  facebook?: string
+  whatsapp?: string
+  whatsappGroup?: string
+  youtube?: string
+  discord?: string
+  x?: string
+  website?: string
+}
+
+export interface UserType {
+  id: string
+  name: string
+  email: string
+  username?: string
+  role?: string
+  avatar?: string
+  coverImage?: string
+  bio?: string
+  city?: string
+  socials?: SocialLinks
+  createdEventCount?: number
+  createdSpaceCount?: number
+}
+/* =========================
+   EVENT TYPES
+========================= */
+
+export interface EventCommentReply {
+  id: string
+  userName: string
+  text: string
+  createdAt: string
+}
+
+export interface EventComment {
+  id: string
+  userName: string
+  text: string
+  createdAt: string
+  replies?: EventCommentReply[]
+}
+
+export interface EventReminderConfig {
+  enabled: boolean
+  oneDayBefore?: boolean
+  fiveHoursBefore?: boolean
+  oneHourBefore?: boolean
+}
+
+export interface EventType {
+  id: string
+  title: string
+  date: string
+  time: string
+  endTime?: string
+
+  location?: string
+  onlineLink?: string
+  locationType?: "physical" | "online" | "hybrid"
+
+  image?: string
+  images?: string[]
+  media?: MediaItem[]
+
+  phoneNumber?: string
+
+  type?: string[] | any
+
+  description?: string
+  shortDescription?: string
+
+  likes?: number
+  isLiked?: boolean
+  isSaved?: boolean
+  isPinned?: boolean
+
+  attendanceStatus?: EventAttendanceStatus
+
+  isPublic?: boolean
+
+  hostName?: string
+  hostUsername?: string
+  hostInstagram?: string
+
+  category?: "event" | "class" | "announcement"
+
+  activityTypes?: string[]
+  audienceTags?: EventAudienceTag[]
+
+  visibility?: "public" | "private"
+
+  pricing?: "free" | "paid"
+  price?: number
+
+  paymentMethod?: "zelle" | "cash" | null
+  paymentValue?: string
+  zelleContact?: string
+
+  commentsCount?: number
+  liked?: boolean
+  saved?: boolean
+  comments?: EventComment[]
+
+  organizer?: string
+  organizerInstagram?: string
+  organizerCreatorId?: string
+
+  isFree?: boolean
+  isOffCampus?: boolean
+  isWorkshop?: boolean
+  isDance?: boolean
+
+  guestLimit?: number
+  ageRule?: "family" | "18+" | "21+"
+
+  specialInstructions?: string
+
+  status?: "upcoming" | "cancelled" | "sold-out" | "completed"
+
+  reminderConfig?: EventReminderConfig
+
+  linkedSpaceId?: SpaceKey | string
+}
+
+/* =========================
+   PRODUCT TYPES
+========================= */
+
+export type ProductCategory =
+  | "sets"
+  | "tops"
+  | "bottoms"
+  | "outerwear"
+  | "bags"
+  | "accessories"
+  | "fitness"
+  | "lifestyle"
+  | "limited"
+
+export type ProductKind = "standard" | "leggings-pack"
+export interface ProductColorOption {
+  id: string
+  label: string
+  swatch?: string
+
+  image?: string
+  images?: string[]
+  lifestyleImages?: string[]
+
+  heroImage?: string
+  featuredImage?: string
+  hoverImage?: string
+
+  targetSlideIndex?: number
+  isDefault?: boolean
+}
+
+export interface ProductType {
+  id: string
+  name: string
+  price: number
+
+  kind?: ProductKind
+
+  image?: string
+  images?: string[]
+  media?: MediaItem[]
+  lifestyleImages?: string[]
+
+  description?: string
+  shortDescription?: string
+
+  category?: ProductCategory | string
+  subCategory?: string
+
+  sizes?: string[]
+  colors?: string[]
+  colorOptions?: ProductColorOption[]
+
+  stock?: number
+
+  badge?: "Best Seller" | "New" | "Limited" | "Trending" | "Low Stock"
+  favorite?: boolean
+
+  compareAtPrice?: number
+
+  gender?: "male" | "female" | "unisex"
+
+  material?: string
+  fit?: string
+  care?: string
+  shippingNote?: string
+
+  availability?: "in-stock" | "low-stock" | "out-of-stock"
+
+  featured?: boolean
+  isNew?: boolean
+  isBestSeller?: boolean
+  isLimited?: boolean
+  isTrending?: boolean
+
+  sortOrder?: number
+  collection?: string
+  groupId?: string
+
+  heroImage?: string
+  featuredImage?: string
+  hoverImage?: string
+
+  details?: string[]
+  completeTheLookIds?: string[]
+
+  colorSlideMap?: Record<string, number>
+}
+
+export interface CartItem {
+  id: string
+  productId: string
+  productName: string
+  productImage: string
+  size: string
+  color: string
+  quantity: number
+  price: number
+}
+/* =========================
+   CREATOR TYPES
+========================= */
+
+export interface Creator {
+  id: string
+  name: string
+  username: string
+
+  displayName?: string
+
+  avatar?: string
+  coverImage?: string
+
+  role?: CreatorRole | string
+  badgeLabel?: CreatorBadgeLabel
+
+  bio?: string
+  city?: string
+
+  instagram?: string
+  instagramUrl?: string
+
+  socials?: SocialLinks
+
+  followers?: number
+  following?: number
+  posts?: number
+  events?: number
+
+  isFollowing?: boolean
+  isVerified?: boolean
+
+  followersCount?: number
+  followingCount?: number
+  postsCount?: number
+  eventsCount?: number
+
+  totalLikes?: number
+}
+
+/* =========================
+   COMMUNITY TYPES
+========================= */
+
+export interface CommunityReply {
+  id: string
+  authorId: string
+  authorName: string
+  authorAvatar: string
+  content: string
+  createdAt: string
+}
+
+export interface CommunityComment {
+  id: string
+  authorId: string
+  authorName: string
+  authorAvatar: string
+  content: string
+  createdAt: string
+  replies: CommunityReply[]
+}
+
+export interface CommunityPollOption {
+  id: string
+  text: string
+  votes: number
+}
+
+export interface CommunityPost {
+  id: string
+  authorId: string
+
+  type: CommunityPostType
+  content: string
+
+  image?: string
+
+  mediaType?: MediaType
+  mediaUrl?: string
+  thumbnailUrl?: string
+  durationSeconds?: number
+  media?: MediaItem[]
+
+  createdAt: string
+
+  likes: number
+  isLiked: boolean
+
+  comments: CommunityComment[]
+
+  instagramUrl?: string
+
+  pollOptions?: CommunityPollOption[]
+  selectedPollOptionId?: string
+
+  spaceKey?: SpaceKey | null
+  eventId?: string | null
+  isEventThread?: boolean
+
+  expiresAt?: string
+
+  tags?: string[]
+}
+/* =========================
+   STORY TYPES
+========================= */
+
+export interface CommunityStorySlide {
+  id: string
+  type: MediaType
+
+  image?: string
+  videoUrl?: string
+  thumbnailUrl?: string
+
+  durationSeconds?: number
+  content?: string
+
+  createdAt: string
+}
+
+export interface StoryReply {
+  id: string
+  authorId: string
+  authorName: string
+  authorAvatar: string
+  text: string
+  createdAt: string
+}
+
+export interface CommunityStory {
+  id: string
+  authorId: string
+
+  type: CommunityStoryType
+  content: string
+
+  image?: string
+  videoUrl?: string
+  thumbnailUrl?: string
+
+  durationSeconds?: number
+  media?: MediaItem[]
+
+  createdAt: string
+  expiresAt: string
+
+  instagramUrl?: string
+
+  storyViewMode: StoryViewMode
+  audience: StoryAudience
+
+  slides: CommunityStorySlide[]
+
+  seenByMe?: boolean
+
+  likesCount?: number
+  isLiked?: boolean
+
+  quickReactions?: Partial<Record<StoryReaction, number>>
+  myReaction?: StoryReaction | null
+
+  replies?: StoryReply[]
+}
+
+/* =========================
+   CREATE COMMUNITY INPUT
+========================= */
+
+type CreatorListType = "top-creators" | "followers" | "following"
+
+interface CreateCommunityPostInput {
+  content: string
+  image?: string
+  instagramUrl?: string
+
+  type: "post" | "story" | "poll" | "video"
+
+  storyViewMode?: StoryViewMode
+  pollOptions?: string[]
+  spaceKey?: SpaceKey | null
+  audience?: StoryAudience
+
+  slides?: CommunityStorySlide[]
+  media?: MediaItem[]
+}
+/* =========================
+   CREATE SPACE INPUT
+========================= */
+
+interface CreateSpaceInput {
+  label: string
+  emoji: string
+  description: string
+  visibility: SpaceVisibility
+  linkedEventId?: string
+}
+
+/* =========================
+   APP CONTEXT TYPE
+========================= */
+
+interface AppContextType {
+  currentScreen: Screen
+  setCurrentScreen: (screen: Screen) => void
+  navigateTo: (screen: Screen) => void
+  goBack: () => void
+
+  user: UserType | null
+  setUser: (user: UserType | null) => void
+  updateMyProfile: (updates: Partial<UserType>) => void
+  updateMySocials: (updates: Partial<SocialLinks>) => void
+
+  homeSelectedDate: string
+  setHomeSelectedDate: (date: string) => void
+
+  events: EventType[]
+  selectedEvent: EventType | null
+  setSelectedEvent: (event: EventType | null) => void
+
+  lastEventSource: "home" | "calendar" | null
+  setLastEventSource: (source: "home" | "calendar") => void
+
+  createEvent: (event: EventType) => void
+  updateEvent: (eventId: string, updates: Partial<EventType>) => void
+
+  toggleLike: (eventId: string) => void
+  toggleSave: (eventId: string) => void
+  togglePinEvent: (eventId: string) => void
+
+  setAttendanceStatus: (eventId: string, status: EventAttendanceStatus) => void
+
+  getPinnedEvents: () => EventType[]
+  getSavedEvents: () => EventType[]
+  getGoingEvents: () => EventType[]
+
+  openPinnedCalendarFocus: () => void
+  openCalendarExpandFromHome: (date?: string) => void
+  openEventInCalendar: (eventId: string, mode?: CalendarEntryMode) => void
+
+  addComment: (eventId: string, text: string) => void
+  addReplyToComment: (eventId: string, commentId: string, text: string) => void
+
+  calendarSearchOpen: boolean
+  setCalendarSearchOpen: (open: boolean) => void
+  calendarSearchQuery: string
+  setCalendarSearchQuery: (query: string) => void
+
+  selectedDate: string
+  setSelectedDate: (date: string) => void
+
+  currentMonth: number
+  setCurrentMonth: (month: number) => void
+
+  calendarFilters: string[]
+  setCalendarFilters: (filters: string[]) => void
+  calendarViewMode: CalendarEntryMode
+  setCalendarViewMode: (mode: CalendarEntryMode) => void
+
+  calendarEntrySource: CalendarEntrySource
+  setCalendarEntrySource: (source: CalendarEntrySource) => void
+
+  calendarHighlightedEventId: string | null
+  setCalendarHighlightedEventId: (eventId: string | null) => void
+
+  products: ProductType[]
+  setProducts: (products: ProductType[]) => void
+
+  selectedProduct: ProductType | null
+  setSelectedProduct: (product: ProductType | null) => void
+
+  cartItems: CartItem[]
+
+  addToCart: (args: {
+    product: ProductType
+    size: string
+    color: string
+    quantity: number
+  }) => void
+
+  removeFromCart: (id: string) => void
+  updateCartQuantity: (id: string, qty: number) => void
+  clearCart: () => void
+
+  cartSubtotal: number
+  cartShipping: number
+  cartTotal: number
+
+  creators: Creator[]
+  setCreators: (creators: Creator[]) => void
+
+  selectedCreator: Creator | null
+  setSelectedCreator: (creator: Creator | null) => void
+
+  openCreatorProfile: (creatorId: string) => void
+  toggleFollow: (id: string) => void
+
+  creatorListType: CreatorListType
+  creatorListTitle: string
+
+  openCreatorList: (
+    type: CreatorListType,
+    creatorId?: string | null,
+    title?: string
+  ) => void
+
+  getTopCreators: () => Creator[]
+  getCreatorFollowers: (creatorId: string) => Creator[]
+  getCreatorFollowing: (creatorId: string) => Creator[]
+  getCreatorEvents: (creatorId: string) => EventType[]
+
+  communityPosts: CommunityPost[]
+  communityStories: CommunityStory[]
+
+  createCommunityPost: (input: CreateCommunityPostInput) => void
+  toggleCommunityLike: (postId: string) => void
+
+  addCommunityComment: (postId: string, text: string) => void
+  addCommunityReply: (postId: string, commentId: string, text: string) => void
+
+  voteOnPoll: (postId: string, optionId: string) => void
+  getStoriesForSource: (source: "home" | "community") => CommunityStory[]
+
+  markStorySeen: (storyId: string) => void
+  toggleStoryLike: (storyId: string) => void
+  addStoryReply: (storyId: string, text: string) => void
+  setStoryReaction: (storyId: string, reaction: StoryReaction) => void
+
+  selectedStoryId: string | null
+  setSelectedStoryId: (id: string | null) => void
+
+  storySource: "home" | "community" | null
+  openStory: (storyId: string, source: "home" | "community") => void
+
+  spaces: SpaceType[]
+  activeSpace: SpaceKey | null
+
+  setActiveSpace: (space: SpaceKey | null) => void
+  openSpace: (space: SpaceKey) => void
+
+  toggleJoinSpace: (space: SpaceKey) => void
+  requestJoinSpace: (space: SpaceKey) => void
+
+  createSpace: (input: CreateSpaceInput) => boolean
+  getSpaceLimitInfo: () => SpaceLimitInfo
+  getSpacePosts: (space: SpaceKey | null) => CommunityPost[]
+  getSpaceFreshness: (space: SpaceType) => SpaceFreshness
+
+  notifications: NotificationItem[]
+  markNotificationRead: (notificationId: string) => void
+  markAllNotificationsRead: () => void
+  openNotificationTarget: (notification: NotificationItem) => void
+
+  selectedNotification: NotificationItem | null
+  setSelectedNotification: (notification: NotificationItem | null) => void
+}
+
+const AppContext = createContext<AppContextType | null>(null)
+/* =========================
+   ASSETS (RUTAS FIJAS 🔥)
+========================= */
+
+const DEFAULT_ASSET = "/images/placeholders/sv-placeholder-dark.jpg"
+
+/* --- CREATOR ASSETS --- */
+
+const CREATOR_MARIO_AVATAR = "/creators/mario-profile.jpg"
+const CREATOR_MARIO_COVER = "/creators/mario-cover.jpg"
+
+const SV_LOGO_ASSET = "/creators/sinverguenza-profile.jpg"
+const SV_GROUP_ASSET = "/creators/sinverguenza-cover.jpg"
+
+const CREATOR_VICTORIA_AVATAR = "/creators/victoria-profile.jpg"
+const CREATOR_VICTORIA_COVER = "/creators/victoria-cover.jpg"
+
+const CREATOR_ADONTE_AVATAR = "/creators/adonte-profile.jpg"
+const CREATOR_ADONTE_COVER = "/creators/adonte-cover.jpg"
+
+const CREATOR_LINDSAY_AVATAR = "/creators/lindsay-profile.jpg"
+const CREATOR_LINDSAY_COVER = "/creators/lindsay-cover.jpg"
+
+/* --- EVENT ASSETS --- */
+
+const EVENT_SV_BACHATA_FLOW = "/events/sv-bachata-flow.jpg"
+const EVENT_VICTORIA_SALSA = "/events/victoria-salsa-bachata.jpg"
+const EVENT_ROOFTOP = "/events/rooftop-party.jpg"
+
+/* --- COMMUNITY ASSETS --- */
+
+const COMMUNITY_SV_BACHATA_POST = "/community/sv-bachata-flow-post.jpg"
+const COMMUNITY_VICTORIA_SALSA = "/community/victoria-salsa-practice.jpg"
+/* --- STORY ASSETS --- */
+
+const STORY_MARIO = "/stories/mario-story.jpg"
+const STORY_SV = "/stories/sinverguenza-story.jpg"
+const STORY_VICTORIA = "/stories/victoria-story.jpg"
+const STORY_ADONTE = "/stories/adonte-story.jpg"
+const STORY_LINDSAY = "/stories/lindsay-story.jpg"
+
+/* --- SHOP ASSETS --- */
+
+const PRODUCT_MATCHING_SET_BLACK = "/shop/sv-matching-set-black-1.jpg"
+const PRODUCT_MATCHING_SET_BURGUNDY = "/shop/sv-matching-set-burgundy-1.jpg"
+const PRODUCT_MATCHING_SET_OLIVE = "/shop/sv-matching-set-olive-1.jpg"
+
+const PRODUCT_CORE_TEE_BLACK = "/shop/sv-core-tee-black-1.jpg"
+const PRODUCT_CORE_TEE_WHITE = "/shop/sv-core-tee-white-1.jpg"
+/* =========================
+   HELPERS 🔥 (CRÍTICO)
+========================= */
+
+function uniqueImages(images: (string | undefined | null)[]) {
+  return images
+    .filter((img): img is string => !!img && img.trim().length > 0)
+    .filter((img, index, arr) => arr.indexOf(img) === index)
+}
+
+function uniqueMedia(media: (MediaItem | undefined | null)[]) {
+  return media
+    .filter((item): item is MediaItem => !!item && !!item.url)
+    .filter((item, index, arr) => arr.findIndex((m) => m.url === item.url) === index)
+}
+
+function imageToMedia(
+  url: string | undefined | null,
+  alt?: string,
+  id = `media-${Date.now()}`
+): MediaItem | null {
+  if (!url) return null
+
+  return {
+    id,
+    type: "image",
+    url,
+    thumbnailUrl: url,
+    alt,
+  }
+}
+
+function videoToMedia(args: {
+  id: string
+  url?: string
+  thumbnailUrl?: string
+  alt?: string
+  durationSeconds?: number
+}): MediaItem | null {
+  if (!args.url) return null
+
+  return {
+    id: args.id,
+    type: "video",
+    url: args.url,
+    thumbnailUrl: args.thumbnailUrl || DEFAULT_ASSET,
+    alt: args.alt,
+    durationSeconds: Math.min(args.durationSeconds ?? 60, 60),
+  }
+}
+
+function normalizeMediaList(args: {
+  media?: MediaItem[]
+  image?: string
+  images?: string[]
+  videoUrl?: string
+  thumbnailUrl?: string
+  durationSeconds?: number
+  alt?: string
+  fallback?: string
+}): MediaItem[] {
+  const imageMedia = uniqueImages([
+    args.image,
+    ...(args.images ?? []),
+    args.fallback,
+  ]).map((img, i) =>
+    imageToMedia(img, args.alt, `img-${i + 1}`)
+  )
+
+  const videoMedia = videoToMedia({
+    id: "video-1",
+    url: args.videoUrl,
+    thumbnailUrl: args.thumbnailUrl,
+    alt: args.alt,
+    durationSeconds: args.durationSeconds,
+  })
+
+  const existing: MediaItem[] = (args.media ?? []).map((item, i) => ({
+    ...item,
+    id: item.id || `media-${i + 1}`,
+    thumbnailUrl:
+      item.thumbnailUrl ||
+      (item.type === "image" ? item.url : args.thumbnailUrl || DEFAULT_ASSET),
+  }))
+
+  const merged = uniqueMedia([...existing, videoMedia, ...imageMedia])
+
+  return merged.length > 0
+    ? merged
+    : [
+        {
+          id: "fallback",
+          type: "image",
+          url: args.fallback || DEFAULT_ASSET,
+          thumbnailUrl: args.fallback || DEFAULT_ASSET,
+        },
+      ]
+}
+
+function getPrimaryMediaUrl(media?: MediaItem[], fallback = DEFAULT_ASSET) {
+  const first = media?.[0]
+  if (!first) return fallback
+
+  return first.type === "video"
+    ? first.thumbnailUrl || fallback
+    : first.url
+}
+
+/* =========================
+   DATE HELPERS
+========================= */
+
+function makeDateAgo(hoursAgo: number) {
+  return new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString()
+}
+
+function makeDateIn(hoursFromNow: number) {
+  return new Date(Date.now() + hoursFromNow * 60 * 60 * 1000).toISOString()
+}
+
+function todayDateString() {
+  return new Date().toISOString().split("T")[0]
+}
+
+function dateInDays(days: number) {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split("T")[0]
+}
+
+function sevenDaysFromNow() {
+  return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+}
+
+function isExpired(value?: string) {
+  if (!value) return false
+  return new Date(value).getTime() <= Date.now()
+}
+/* =========================
+   GENERAL HELPERS
+========================= */
+
+function normalizeWhatsApp(value?: string) {
+  const raw = (value || "").trim()
+  if (!raw) return ""
+
+  if (raw.startsWith("http")) return raw
+
+  const digits = raw.replace(/[^\d+]/g, "")
+  if (!digits) return raw
+
+  return `https://wa.me/${digits.replace("+", "")}`
+}
+
+function normalizeComments(comments?: EventComment[]) {
+  return (comments ?? []).map((comment) => ({
+    ...comment,
+    replies: comment.replies ?? [],
+  }))
+}
+
+function getEventSortTimestamp(event: EventType) {
+  return new Date(`${event.date}T${event.time || "00:00"}`).getTime()
+}
+
+function isFutureOrTodayEvent(event: EventType) {
+  return getEventSortTimestamp(event) >= Date.now() - 60 * 1000
+}
+
+function getStorySortTimestamp(story: CommunityStory) {
+  return new Date(story.createdAt).getTime()
+}
+
+function isStoryExpired(story: CommunityStory) {
+  return new Date(story.expiresAt).getTime() <= Date.now()
+}
+
+function isFreshWithin7Days(dateString: string) {
+  const created = new Date(dateString).getTime()
+  const sevenDays = 7 * 24 * 60 * 60 * 1000
+  return Date.now() - created <= sevenDays
+}
+
+/* =========================
+   SPACE LIMIT HELPERS
+========================= */
+
+function getMaxSpacesAllowed(eventCount: number): number {
+  if (eventCount >= 6) return 5
+  if (eventCount >= 3) return 3
+  return 1
+}
+
+function buildSpaceLimitInfo(user: UserType | null): SpaceLimitInfo {
+  const createdEvents = user?.createdEventCount ?? 0
+  const createdSpaces = user?.createdSpaceCount ?? 0
+  const maxSpacesAllowed = getMaxSpacesAllowed(createdEvents)
+  const remainingSpaces = Math.max(0, maxSpacesAllowed - createdSpaces)
+
+  let nextUnlockMessage = "Create 3 events to unlock up to 3 spaces"
+
+  if (createdEvents >= 6) {
+    nextUnlockMessage = "Maximum creator space limit unlocked"
+  } else if (createdEvents >= 3) {
+    nextUnlockMessage = "Create 6 events to unlock up to 5 spaces"
+  }
+
+  return {
+    createdEvents,
+    createdSpaces,
+    maxSpacesAllowed,
+    remainingSpaces,
+    canCreateMore: remainingSpaces > 0,
+    nextUnlockMessage,
+  }
+}
+
+function buildMarioReminderConfig(): EventReminderConfig {
+  return {
+    enabled: false,
+    oneDayBefore: false,
+    fiveHoursBefore: false,
+    oneHourBefore: false,
+  }
+}
+/* =========================
+   NORMALIZERS
+========================= */
+
+function normalizeCreator(creator: Creator): Creator {
+  const roleLower = String(
+    creator.role || creator.badgeLabel || "member"
+  ).toLowerCase()
+
+  const badgeLabel: CreatorBadgeLabel =
+    creator.badgeLabel ||
+    (roleLower.includes("official")
+      ? "Official"
+      : roleLower.includes("instructor")
+        ? "Instructor"
+        : roleLower.includes("host")
+          ? "Host"
+          : "Member")
+
+  const role: CreatorRole =
+    roleLower.includes("official")
+      ? "official"
+      : roleLower.includes("instructor")
+        ? "instructor"
+        : roleLower.includes("host")
+          ? "host"
+          : "member"
+
+  return {
+    ...creator,
+    displayName: creator.displayName || creator.name,
+    badgeLabel,
+    role,
+    avatar: creator.avatar || DEFAULT_ASSET,
+    coverImage: creator.coverImage || DEFAULT_ASSET,
+    followers: creator.followers ?? creator.followersCount ?? 0,
+    following: creator.following ?? creator.followingCount ?? 0,
+    posts: creator.posts ?? creator.postsCount ?? 0,
+    events: creator.events ?? creator.eventsCount ?? 0,
+    followersCount: creator.followersCount ?? creator.followers ?? 0,
+    followingCount: creator.followingCount ?? creator.following ?? 0,
+    postsCount: creator.postsCount ?? creator.posts ?? 0,
+    eventsCount: creator.eventsCount ?? creator.events ?? 0,
+    totalLikes: creator.totalLikes ?? 0,
+    isFollowing: creator.isFollowing ?? false,
+    isVerified: creator.isVerified ?? badgeLabel === "Official",
+    instagramUrl:
+      creator.instagramUrl ||
+      creator.socials?.instagram ||
+      (creator.instagram
+        ? `https://instagram.com/${creator.instagram.replace("@", "")}`
+        : undefined),
+    socials: {
+      ...(creator.socials || {}),
+      instagram:
+        creator.socials?.instagram ||
+        creator.instagramUrl ||
+        (creator.instagram
+          ? `https://instagram.com/${creator.instagram.replace("@", "")}`
+          : undefined),
+      whatsapp: normalizeWhatsApp(creator.socials?.whatsapp),
+    },
+  }
+}
+
+function normalizeEvent(event: EventType): EventType {
+  const media = normalizeMediaList({
+    media: event.media,
+    image: event.image,
+    images: event.images,
+    alt: event.title,
+    fallback: DEFAULT_ASSET,
+  })
+
+  return {
+    ...event,
+    media,
+    image: getPrimaryMediaUrl(media),
+    images:
+      event.images && event.images.length > 0
+        ? uniqueImages(event.images)
+        : media.filter((item) => item.type === "image").map((item) => item.url),
+    likes: event.likes ?? 0,
+    commentsCount: event.commentsCount ?? event.comments?.length ?? 0,
+    comments: normalizeComments(event.comments),
+    isLiked: event.isLiked ?? event.liked ?? false,
+    isSaved: event.isSaved ?? event.saved ?? false,
+    isPinned: event.isPinned ?? false,
+    attendanceStatus: event.attendanceStatus ?? null,
+    isFree: event.isFree ?? (event.pricing === "free" || event.price === 0),
+    visibility: event.visibility ?? (event.isPublic === false ? "private" : "public"),
+    pricing: event.pricing ?? "free",
+    price: event.price ?? 0,
+    paymentMethod: event.paymentMethod ?? null,
+    paymentValue: event.paymentValue ?? "",
+    zelleContact: event.zelleContact ?? "",
+    activityTypes: event.activityTypes ?? [],
+    audienceTags: event.audienceTags ?? [],
+    status: event.status ?? "upcoming",
+    reminderConfig: event.reminderConfig ?? buildMarioReminderConfig(),
+  }
+}
+/* =========================
+   NORMALIZERS CONTINUED
+========================= */
+
+function normalizeStory(story: CommunityStory): CommunityStory {
+  const slides =
+    story.slides && story.slides.length > 0
+      ? story.slides
+      : [
+          {
+            id: `${story.id}-slide-1`,
+            type: story.type === "video" ? "video" : "image",
+            image: story.image || story.thumbnailUrl || DEFAULT_ASSET,
+            videoUrl: story.videoUrl,
+            thumbnailUrl: story.thumbnailUrl || story.image || DEFAULT_ASSET,
+            durationSeconds: Math.min(story.durationSeconds ?? 8, 60),
+            content: story.content,
+            createdAt: story.createdAt,
+          },
+        ]
+
+  const media = normalizeMediaList({
+    media: story.media,
+    image: story.image,
+    images: slides
+      .filter((slide) => slide.type === "image")
+      .map((slide) => slide.image || DEFAULT_ASSET),
+    videoUrl:
+      story.videoUrl ||
+      slides.find((slide) => slide.type === "video")?.videoUrl,
+    thumbnailUrl:
+      story.thumbnailUrl ||
+      slides[0]?.thumbnailUrl ||
+      slides[0]?.image,
+    durationSeconds: story.durationSeconds,
+    alt: story.content,
+    fallback: DEFAULT_ASSET,
+  })
+
+  return {
+    ...story,
+    media,
+    image: story.image || getPrimaryMediaUrl(media),
+    thumbnailUrl: story.thumbnailUrl || getPrimaryMediaUrl(media),
+    durationSeconds: Math.min(story.durationSeconds ?? 8, 60),
+    audience: story.audience ?? "public",
+
+    slides: slides.map((slide, index) => ({
+      ...slide,
+      id: slide.id || `${story.id}-slide-${index + 1}`,
+      image: slide.image || slide.thumbnailUrl || DEFAULT_ASSET,
+      thumbnailUrl: slide.thumbnailUrl || slide.image || DEFAULT_ASSET,
+      durationSeconds:
+        slide.type === "video"
+          ? Math.min(slide.durationSeconds ?? 15, 60)
+          : slide.durationSeconds,
+    })),
+
+    seenByMe: story.seenByMe ?? false,
+    likesCount: story.likesCount ?? 0,
+    isLiked: story.isLiked ?? false,
+
+    quickReactions: {
+      "❤️": story.quickReactions?.["❤️"] ?? 0,
+      "🔥": story.quickReactions?.["🔥"] ?? 0,
+      "👏": story.quickReactions?.["👏"] ?? 0,
+      "🕺🏾": story.quickReactions?.["🕺🏾"] ?? 0,
+      "💃": story.quickReactions?.["💃"] ?? 0,
+      "😎": story.quickReactions?.["😎"] ?? 0,
+      "🤣": story.quickReactions?.["🤣"] ?? 0,
+    },
+
+    myReaction: story.myReaction ?? null,
+    replies: story.replies ?? [],
+  }
+}
+
+function normalizeCommunityPost(post: CommunityPost): CommunityPost {
+  const media = normalizeMediaList({
+    media: post.media,
+    image: post.image,
+    videoUrl: post.mediaType === "video" ? post.mediaUrl : undefined,
+    thumbnailUrl: post.thumbnailUrl || post.image,
+    durationSeconds: post.durationSeconds,
+    alt: post.content,
+    fallback: post.image || DEFAULT_ASSET,
+  })
+
+  const primaryMedia = media[0]
+  const mediaType = post.mediaType || primaryMedia?.type || "image"
+
+  return {
+    ...post,
+    media,
+    mediaType,
+    mediaUrl: post.mediaUrl || primaryMedia?.url,
+    thumbnailUrl:
+      post.thumbnailUrl ||
+      primaryMedia?.thumbnailUrl ||
+      (primaryMedia?.type === "image" ? primaryMedia.url : undefined),
+    durationSeconds:
+      mediaType === "video"
+        ? Math.min(
+            post.durationSeconds ??
+              primaryMedia?.durationSeconds ??
+              60,
+            60
+          )
+        : undefined,
+    image: post.image || getPrimaryMediaUrl(media, ""),
+    comments: post.comments ?? [],
+    tags: post.tags ?? [],
+    spaceKey: post.spaceKey ?? null,
+    eventId: post.eventId ?? null,
+    isEventThread: post.isEventThread ?? false,
+  }
+}
+/* =========================
+   SPACE / PRODUCT NORMALIZERS
+========================= */
+
+function getSpaceFreshnessFromDates(createdAt?: string, expiresAt?: string): SpaceFreshness {
+  if (expiresAt && isExpired(expiresAt)) return "expired"
+
+  if (!createdAt) return "active"
+
+  const created = new Date(createdAt).getTime()
+  const ageHours = (Date.now() - created) / (1000 * 60 * 60)
+
+  if (ageHours <= 24) return "new"
+  if (ageHours <= 7 * 24) return "active"
+
+  return "quiet"
+}
+
+function normalizeSpace(space: SpaceType): SpaceType {
+  const visibility = space.visibility ?? (space.key === "private" ? "private" : "public")
+
+  return {
+    ...space,
+    visibility,
+    requestStatus:
+      space.requestStatus ??
+      (space.isJoined ? "approved" : "none"),
+    createdAt: space.createdAt ?? new Date().toISOString(),
+    freshness:
+      space.freshness ??
+      getSpaceFreshnessFromDates(space.createdAt, space.expiresAt),
+  }
+}
+
+function normalizeProductColorOptions(product: ProductType): ProductColorOption[] {
+  const baseImages = uniqueImages([
+    product.image,
+    product.heroImage,
+    ...(product.images ?? []),
+    ...(product.lifestyleImages ?? []),
+  ])
+
+  const safeBaseImages =
+    baseImages.length > 0 ? baseImages : [product.image || DEFAULT_ASSET]
+
+  if (product.colorOptions && product.colorOptions.length > 0) {
+    return product.colorOptions.map((option, index) => {
+      const optionImages = uniqueImages([
+        option.image,
+        option.heroImage,
+        option.featuredImage,
+        option.hoverImage,
+        ...(option.images ?? []),
+        ...(option.lifestyleImages ?? []),
+      ])
+
+      const safeOptionImages =
+        optionImages.length > 0 ? optionImages : safeBaseImages
+
+      return {
+        ...option,
+        id: option.id || `${product.id}-color-${index + 1}`,
+        label: option.label || product.colors?.[index] || `Color ${index + 1}`,
+        swatch: option.swatch || option.label || product.colors?.[index],
+        image: option.image || safeOptionImages[0],
+        images: safeOptionImages,
+        lifestyleImages: option.lifestyleImages ?? [],
+        heroImage: option.heroImage || safeOptionImages[0],
+        featuredImage: option.featuredImage || safeOptionImages[0],
+        hoverImage: option.hoverImage || safeOptionImages[1] || safeOptionImages[0],
+        isDefault: option.isDefault ?? index === 0,
+      }
+    })
+  }
+
+  const fallbackColors =
+    product.colors && product.colors.length > 0 ? product.colors : ["Default"]
+
+  return fallbackColors.map((color, index) => ({
+    id: `${product.id}-color-${index + 1}`,
+    label: color,
+    swatch: color,
+    image: safeBaseImages[0],
+    images: safeBaseImages,
+    lifestyleImages: product.lifestyleImages ?? [],
+    heroImage: safeBaseImages[0],
+    featuredImage: safeBaseImages[0],
+    hoverImage: safeBaseImages[1] || safeBaseImages[0],
+    isDefault: index === 0,
+  }))
+}
+
+function normalizeProduct(product: ProductType, index: number): ProductType {
+  const stock = typeof product.stock === "number" ? product.stock : 12
+
+  const availability: ProductType["availability"] =
+    stock <= 0 ? "out-of-stock" : stock <= 8 ? "low-stock" : "in-stock"
+
+  const media = normalizeMediaList({
+    media: product.media,
+    image: product.image,
+    images: product.images,
+    fallback: DEFAULT_ASSET,
+    alt: product.name,
+  })
+
+  const colorOptions = normalizeProductColorOptions({
+    ...product,
+    image: getPrimaryMediaUrl(media),
+    images: media.map((item) => item.url),
+  })
+
+  const defaultColor =
+    colorOptions.find((option) => option.isDefault) || colorOptions[0]
+
+  const finalImages =
+    defaultColor?.images && defaultColor.images.length > 0
+      ? defaultColor.images
+      : media.map((item) => item.url)
+
+  return {
+    ...product,
+    media,
+    image: getPrimaryMediaUrl(media),
+    images: finalImages,
+    colors:
+      product.colors && product.colors.length > 0
+        ? product.colors
+        : colorOptions.map((option) => option.label),
+    colorOptions,
+    shortDescription:
+      product.shortDescription ||
+      product.description?.slice(0, 80) ||
+      "Premium Sin Vergüenza piece",
+    stock,
+    availability,
+    compareAtPrice:
+      product.compareAtPrice ??
+      (product.price >= 50 ? Number((product.price * 1.2).toFixed(0)) : undefined),
+    featured:
+      product.featured ??
+      (product.badge === "Best Seller" || product.badge === "New" || index < 2),
+    isBestSeller: product.isBestSeller ?? product.badge === "Best Seller",
+    isNew: product.isNew ?? product.badge === "New",
+    isLimited: product.isLimited ?? product.badge === "Limited",
+    isTrending: product.isTrending ?? false,
+    material: product.material ?? "Premium quality",
+    fit: product.fit ?? "True to size",
+    care: product.care ?? "Wash cold, air dry",
+    shippingNote: product.shippingNote ?? "Ships in 2–4 business days",
+    gender: product.gender ?? "unisex",
+    sortOrder: product.sortOrder ?? index + 1,
+    collection: product.collection ?? "core",
+    heroImage: product.heroImage || getPrimaryMediaUrl(media),
+    featuredImage: product.featuredImage || getPrimaryMediaUrl(media),
+    hoverImage: product.hoverImage || finalImages[1] || finalImages[0],
+  }
+}
+/* =========================
+   INITIAL USER / CREATORS
+========================= */
+
+const INITIAL_USER: UserType = {
+  id: "me-user",
+  name: "Mario",
+  email: "mario@example.com",
+  username: "mariorafaelrosario",
+  role: "member",
+  avatar: CREATOR_MARIO_AVATAR,
+  coverImage: CREATOR_MARIO_COVER,
+  bio: "Passion for dance and community ✨",
+  city: "Bronx, NY",
+  createdEventCount: 3,
+  createdSpaceCount: 1,
+  socials: {
+    instagram:
+      "https://www.instagram.com/mariorafaelrosario?igsh=ODljMWRtMTRvdG9x&utm_source=qr",
+    whatsapp: "https://wa.me/",
+  },
+}
+
+function buildMeCreator(user: UserType): Creator {
+  return normalizeCreator({
+    id: user.id,
+    name: user.name,
+    displayName: user.name,
+    username: user.username || "mariorafaelrosario",
+    role: "member",
+    badgeLabel: "Member",
+    avatar: user.avatar || CREATOR_MARIO_AVATAR,
+    coverImage: user.coverImage || CREATOR_MARIO_COVER,
+    bio: user.bio || "Passion for dance and community ✨",
+    city: user.city || "Bronx, NY",
+    isFollowing: false,
+    isVerified: false,
+    followersCount: 280,
+    followingCount: 210,
+    postsCount: 12,
+    eventsCount: user.createdEventCount ?? 3,
+    totalLikes: 540,
+    socials: {
+      ...(user.socials || {}),
+      whatsapp: normalizeWhatsApp(user.socials?.whatsapp),
+    },
+  })
+}
+
+function upsertMeCreator(creators: Creator[], user: UserType): Creator[] {
+  const meCreator = buildMeCreator(user)
+  const normalized = creators.map(normalizeCreator)
+  const exists = normalized.some((creator) => creator.id === user.id)
+
+  if (!exists) return [meCreator, ...normalized]
+
+  return normalized.map((creator) =>
+    creator.id === user.id
+      ? normalizeCreator({
+          ...creator,
+          ...meCreator,
+          socials: {
+            ...(creator.socials || {}),
+            ...(meCreator.socials || {}),
+          },
+        })
+      : creator
+  )
+}
+
+const BASE_CREATORS: Creator[] = [
+  {
+    id: "creator-official-sv",
+    name: "Sin Vergüenza",
+    displayName: "Sin Vergüenza",
+    username: "sinvnyc",
+    avatar: SV_LOGO_ASSET,
+    coverImage: SV_GROUP_ASSET,
+    badgeLabel: "Official",
+    role: "official",
+    bio: "Official page for events, updates, and community moments.",
+    city: "New York, NY",
+    instagram: "@sinvnyc",
+    instagramUrl: "https://www.instagram.com/sinvnyc?igsh=azV0d2c0bXRzYzE2",
+    followersCount: 1240,
+    followingCount: 42,
+    postsCount: 18,
+    eventsCount: 12,
+    totalLikes: 4400,
+    isFollowing: true,
+    isVerified: true,
+    socials: {
+      instagram: "https://www.instagram.com/sinvnyc?igsh=azV0d2c0bXRzYzE2",
+      whatsappGroup: "https://chat.whatsapp.com/",
+      tiktok: "https://tiktok.com/",
+      facebook: "https://facebook.com/",
+    },
+  },
+  {
+    id: "creator-victoria",
+    name: "Victoria",
+    displayName: "Victoria",
+    username: "queenvictoriuhhh",
+    avatar: CREATOR_VICTORIA_AVATAR,
+    coverImage: CREATOR_VICTORIA_COVER,
+    badgeLabel: "Instructor",
+    role: "instructor",
+    bio: "Salsa and bachata instructor bringing confidence, timing, and flow to every class.",
+    city: "New York, NY",
+    instagram: "@queenvictoriuhhh",
+    instagramUrl: "https://www.instagram.com/queenvictoriuhhh?igsh=aGtjdnM4dDh0aDN0",
+    followersCount: 410,
+    followingCount: 280,
+    postsCount: 8,
+    eventsCount: 2,
+    totalLikes: 720,
+    isFollowing: true,
+    socials: {
+      instagram: "https://www.instagram.com/queenvictoriuhhh?igsh=aGtjdnM4dDh0aDN0",
+    },
+  },
+  {
+    id: "creator-adonte",
+    name: "Adonte",
+    displayName: "Adonte",
+    username: "imadonte",
+    avatar: CREATOR_ADONTE_AVATAR,
+    coverImage: CREATOR_ADONTE_COVER,
+    badgeLabel: "Instructor",
+    role: "instructor",
+    bio: "Kompa, movement, good energy, and smooth social dance moments.",
+    city: "New York, NY",
+    instagram: "@imadonte",
+    instagramUrl: "https://www.instagram.com/imadonte?igsh=ZmV2a200ZXNyMWo4",
+    followersCount: 390,
+    followingCount: 190,
+    postsCount: 7,
+    eventsCount: 2,
+    totalLikes: 680,
+    isFollowing: true,
+    socials: {
+      instagram: "https://www.instagram.com/imadonte?igsh=ZmV2a200ZXNyMWo4",
+    },
+  },
+  {
+    id: "creator-lindsay",
+    name: "Lindsay",
+    displayName: "Lindsay",
+    username: "l.nsxy",
+    avatar: CREATOR_LINDSAY_AVATAR,
+    coverImage: CREATOR_LINDSAY_COVER,
+    badgeLabel: "Instructor",
+    role: "instructor",
+    bio: "Cumbia, community, and social dancing with a friendly vibe.",
+    city: "New York, NY",
+    instagram: "@l.nsxy",
+    instagramUrl: "https://www.instagram.com/l.nsxy?igsh=eDViMGZrZDhmMmpr",
+    followersCount: 365,
+    followingCount: 201,
+    postsCount: 6,
+    eventsCount: 2,
+    totalLikes: 590,
+    isFollowing: true,
+    socials: {
+      instagram: "https://www.instagram.com/l.nsxy?igsh=eDViMGZrZDhmMmpr",
+    },
+  },
+]
+
+const INITIAL_CREATORS: Creator[] = upsertMeCreator(BASE_CREATORS, INITIAL_USER)
+/* =========================
+   INITIAL SPACES
+========================= */
+
+const INITIAL_SPACES: SpaceType[] = [
+  {
+    key: "dance",
+    label: "Dance",
+    emoji: "💃",
+    description: "Everything dance-related in one place.",
+    membersCount: 420,
+    topicsCount: 36,
+    isJoined: true,
+    visibility: "public",
+    requestStatus: "approved",
+    createdAt: makeDateAgo(12),
+  },
+  {
+    key: "events",
+    label: "Events",
+    emoji: "📅",
+    description: "Announcements, attendance, and event plans.",
+    membersCount: 270,
+    topicsCount: 28,
+    isJoined: true,
+    visibility: "public",
+    requestStatus: "approved",
+    createdAt: makeDateAgo(18),
+  },
+  {
+    key: "workshop",
+    label: "Workshop",
+    emoji: "🎓",
+    description: "Technique, classes, training, and learning.",
+    membersCount: 188,
+    topicsCount: 17,
+    isJoined: false,
+    visibility: "public",
+    requestStatus: "none",
+    createdAt: makeDateAgo(36),
+  },
+  {
+    key: "music",
+    label: "Music",
+    emoji: "🎵",
+    description: "Playlists, songs, and event music talk.",
+    membersCount: 141,
+    topicsCount: 12,
+    isJoined: false,
+    visibility: "public",
+    requestStatus: "none",
+    createdAt: makeDateAgo(42),
+  },
+  {
+    key: "free",
+    label: "Free",
+    emoji: "🎉",
+    description: "Talk about free events and open meetups.",
+    membersCount: 133,
+    topicsCount: 11,
+    isJoined: false,
+    visibility: "public",
+    requestStatus: "none",
+    createdAt: makeDateAgo(48),
+  },
+  {
+    key: "paid",
+    label: "Paid",
+    emoji: "💰",
+    description: "Premium events, tickets, and special sessions.",
+    membersCount: 95,
+    topicsCount: 9,
+    isJoined: false,
+    visibility: "public",
+    requestStatus: "none",
+    createdAt: makeDateAgo(56),
+  },
+  {
+    key: "opportunities",
+    label: "Opportunities",
+    emoji: "🌟",
+    description: "Collaborations, castings, and community openings.",
+    membersCount: 82,
+    topicsCount: 7,
+    isJoined: false,
+    visibility: "private",
+    requestStatus: "none",
+    createdAt: makeDateAgo(28),
+  },
+  {
+    key: "gaming",
+    label: "Gaming",
+    emoji: "🎮",
+    description: "Tournaments, game nights, and campus gaming energy.",
+    membersCount: 76,
+    topicsCount: 6,
+    isJoined: false,
+    visibility: "public",
+    requestStatus: "none",
+    createdAt: makeDateAgo(60),
+  },
+  {
+    key: "social",
+    label: "Social",
+    emoji: "🍷",
+    description: "Meetups, casual plans, parties, and community hangouts.",
+    membersCount: 112,
+    topicsCount: 14,
+    isJoined: false,
+    visibility: "public",
+    requestStatus: "none",
+    createdAt: makeDateAgo(32),
+  },
+  {
+    key: "fitness",
+    label: "Fitness",
+    emoji: "🔥",
+    description: "Movement, conditioning, wellness, and dancer training.",
+    membersCount: 68,
+    topicsCount: 5,
+    isJoined: false,
+    visibility: "private",
+    requestStatus: "none",
+    createdAt: makeDateAgo(20),
+  },
+].map(normalizeSpace)
+
+function generateSpaceKeyFromEvent(event: EventType): SpaceKey {
+  if (event.isDance || event.activityTypes?.includes("dance")) return "dance"
+  if (event.isWorkshop || event.activityTypes?.includes("workshop")) return "workshop"
+  if (event.pricing === "free") return "free"
+  if (event.pricing === "paid") return "paid"
+  return "events"
+}
+
+function buildEventThreadPost(event: EventType, authorId: string): CommunityPost {
+  return normalizeCommunityPost({
+    id: `event-thread-${event.id}`,
+    authorId,
+    type: "post",
+    content: `Talk about ${event.title}. Ask questions, share updates, and see who is going.`,
+    image: event.image || DEFAULT_ASSET,
+    mediaType: "image",
+    mediaUrl: event.image || DEFAULT_ASSET,
+    thumbnailUrl: event.image || DEFAULT_ASSET,
+    createdAt: new Date().toISOString(),
+    expiresAt: sevenDaysFromNow(),
+    likes: 0,
+    isLiked: false,
+    comments: [],
+    spaceKey: event.linkedSpaceId
+      ? (event.linkedSpaceId as SpaceKey)
+      : generateSpaceKeyFromEvent(event),
+    eventId: event.id,
+    isEventThread: true,
+    tags: ["Event Chat"],
+  })
+}
+/* =========================
+   INITIAL COMMUNITY POSTS
+========================= */
+
+const INITIAL_COMMUNITY_POSTS: CommunityPost[] = [
+  {
+    id: "post-sv-bachata-flow",
+    authorId: "creator-official-sv",
+    type: "post",
+    content:
+      "Bachata con Flow is back this week. Come ready to move, connect, and enjoy the community.",
+    image: COMMUNITY_SV_BACHATA_POST,
+    mediaType: "image",
+    mediaUrl: COMMUNITY_SV_BACHATA_POST,
+    thumbnailUrl: COMMUNITY_SV_BACHATA_POST,
+    createdAt: makeDateAgo(2),
+    expiresAt: sevenDaysFromNow(),
+    likes: 42,
+    isLiked: false,
+    instagramUrl: "https://www.instagram.com/sinvnyc?igsh=azV0d2c0bXRzYzE2",
+    spaceKey: "dance",
+    tags: ["Dance", "Workshop", "Events"],
+    comments: [],
+  },
+  {
+    id: "post-victoria-salsa",
+    authorId: "creator-victoria",
+    type: "post",
+    content:
+      "Salsa + bachata practice this Wednesday at 6:30 PM. Beginners are welcome.",
+    image: COMMUNITY_VICTORIA_SALSA,
+    mediaType: "image",
+    mediaUrl: COMMUNITY_VICTORIA_SALSA,
+    thumbnailUrl: COMMUNITY_VICTORIA_SALSA,
+    createdAt: makeDateAgo(4),
+    expiresAt: sevenDaysFromNow(),
+    likes: 31,
+    isLiked: false,
+    instagramUrl:
+      "https://www.instagram.com/queenvictoriuhhh?igsh=aGtjdnM4dDh0aDN0",
+    spaceKey: "dance",
+    tags: ["Dance", "Class"],
+    comments: [],
+  },
+].map(normalizeCommunityPost)
+
+/* =========================
+   INITIAL STORIES
+========================= */
+
+const INITIAL_COMMUNITY_STORIES: CommunityStory[] = [
+  {
+    id: "story-mario",
+    authorId: "me-user",
+    type: "story",
+    content: "Your Story",
+    image: STORY_MARIO,
+    createdAt: makeDateAgo(1),
+    expiresAt: makeDateIn(23),
+    storyViewMode: "internal",
+    instagramUrl:
+      "https://www.instagram.com/mariorafaelrosario?igsh=ODljMWRtMTRvdG9x&utm_source=qr",
+    audience: "both",
+    seenByMe: false,
+    likesCount: 9,
+    isLiked: false,
+    slides: [
+      {
+        id: "story-mario-slide-1",
+        type: "image",
+        image: STORY_MARIO,
+        content: "Your Story",
+        createdAt: makeDateAgo(1),
+      },
+    ],
+    quickReactions: { "❤️": 3, "🔥": 2, "👏": 1 },
+    replies: [],
+  },
+  {
+    id: "story-sv",
+    authorId: "creator-official-sv",
+    type: "story",
+    content: "Weekend recap with Sin Vergüenza.",
+    image: STORY_SV,
+    createdAt: makeDateAgo(2),
+    expiresAt: makeDateIn(20),
+    storyViewMode: "internal",
+    instagramUrl:
+      "https://www.instagram.com/sinvnyc?igsh=azV0d2c0bXRzYzE2",
+    audience: "both",
+    seenByMe: false,
+    likesCount: 22,
+    isLiked: false,
+    slides: [
+      {
+        id: "story-sv-slide-1",
+        type: "image",
+        image: STORY_SV,
+        content: "Weekend recap with Sin Vergüenza.",
+        createdAt: makeDateAgo(2),
+      },
+    ],
+    quickReactions: { "❤️": 8, "🔥": 4, "👏": 2, "💃": 2 },
+    replies: [],
+  },
+  {
+    id: "story-victoria",
+    authorId: "creator-victoria",
+    type: "story",
+    content: "Salsa and bachata practice energy.",
+    image: STORY_VICTORIA,
+    createdAt: makeDateAgo(3),
+    expiresAt: makeDateIn(18),
+    storyViewMode: "internal",
+    instagramUrl:
+      "https://www.instagram.com/queenvictoriuhhh?igsh=aGtjdnM4dDh0aDN0",
+    audience: "both",
+    seenByMe: false,
+    likesCount: 11,
+    isLiked: false,
+    slides: [
+      {
+        id: "story-victoria-slide-1",
+        type: "image",
+        image: STORY_VICTORIA,
+        content: "Salsa and bachata practice energy.",
+        createdAt: makeDateAgo(3),
+      },
+    ],
+    quickReactions: { "❤️": 5, "🔥": 2 },
+    replies: [],
+  },
+  {
+    id: "story-adonte",
+    authorId: "creator-adonte",
+    type: "story",
+    content: "Kompa flow and smooth partner work.",
+    image: STORY_ADONTE,
+    createdAt: makeDateAgo(4),
+    expiresAt: makeDateIn(17),
+    storyViewMode: "internal",
+    instagramUrl:
+      "https://www.instagram.com/imadonte?igsh=ZmV2a200ZXNyMWo4",
+    audience: "both",
+    seenByMe: true,
+    likesCount: 14,
+    isLiked: false,
+    slides: [
+      {
+        id: "story-adonte-slide-1",
+        type: "image",
+        image: STORY_ADONTE,
+        content: "Kompa flow and smooth partner work.",
+        createdAt: makeDateAgo(4),
+      },
+    ],
+    quickReactions: { "🔥": 4, "😎": 2, "🕺🏾": 1 },
+    replies: [],
+  },
+  {
+    id: "story-lindsay",
+    authorId: "creator-lindsay",
+    type: "story",
+    content: "Cumbia class vibes at Hunter.",
+    image: STORY_LINDSAY,
+    createdAt: makeDateAgo(5),
+    expiresAt: makeDateIn(16),
+    storyViewMode: "internal",
+    instagramUrl:
+      "https://www.instagram.com/l.nsxy?igsh=eDViMGZrZDhmMmpr",
+    audience: "both",
+    seenByMe: true,
+    likesCount: 7,
+    isLiked: false,
+    slides: [
+      {
+        id: "story-lindsay-slide-1",
+        type: "image",
+        image: STORY_LINDSAY,
+        content: "Cumbia class vibes at Hunter.",
+        createdAt: makeDateAgo(5),
+      },
+    ],
+    quickReactions: { "💃": 3, "👏": 1 },
+    replies: [],
+  },
+].map(normalizeStory)
+/* =========================
+   STORY SORTING
+========================= */
+
+function sortStoriesForSource(
+  stories: CommunityStory[],
+  source: "home" | "community",
+  myUserId?: string | null
+) {
+  if (source === "home") {
+    return [...stories].sort((a, b) => {
+      const aIsMine = a.authorId === myUserId
+      const bIsMine = b.authorId === myUserId
+
+      if (aIsMine && !bIsMine) return -1
+      if (!aIsMine && bIsMine) return 1
+
+      const aSeen = a.seenByMe ? 1 : 0
+      const bSeen = b.seenByMe ? 1 : 0
+
+      if (aSeen !== bSeen) return aSeen - bSeen
+
+      return getStorySortTimestamp(b) - getStorySortTimestamp(a)
+    })
+  }
+
+  return [...stories].sort(
+    (a, b) => getStorySortTimestamp(b) - getStorySortTimestamp(a)
+  )
+}
+
+/* =========================
+   INITIAL EVENTS
+========================= */
+
+const INITIAL_EVENTS: EventType[] = [
+  {
+    id: "event-sv-bachata-flow",
+    title: "Bachata con Flow",
+    date: dateInDays(1),
+    time: "18:00",
+    endTime: "19:00",
+    location: "John Jay Dance Studio, 524 W 59th Street",
+    image: EVENT_SV_BACHATA_FLOW,
+    images: [EVENT_SV_BACHATA_FLOW],
+    description:
+      "Join Sin Vergüenza for a high-energy bachata experience designed for all levels. This class focuses on connection, musicality, confidence, and community.",
+    shortDescription: "A high-energy bachata workshop for all levels.",
+    likes: 76,
+    commentsCount: 1,
+    hostName: "Sin Vergüenza",
+    hostUsername: "sinvnyc",
+    hostInstagram: "@sinvnyc",
+    organizer: "Sin Vergüenza",
+    organizerInstagram: "@sinvnyc",
+    organizerCreatorId: "creator-official-sv",
+    category: "class",
+    visibility: "public",
+    pricing: "free",
+    price: 0,
+    comments: [],
+    isLiked: false,
+    isSaved: true,
+    isPinned: true,
+    attendanceStatus: "going",
+    activityTypes: ["dance", "workshop"],
+    audienceTags: ["dance", "workshop", "free", "public", "class"],
+    linkedSpaceId: "dance",
+    reminderConfig: buildMarioReminderConfig(),
+  },
+  {
+    id: "event-victoria-salsa-bachata",
+    title: "Salsa & Bachata Fundamentals",
+    date: dateInDays(2),
+    time: "18:30",
+    endTime: "20:00",
+    location: "John Jay College",
+    image: EVENT_VICTORIA_SALSA,
+    images: [EVENT_VICTORIA_SALSA],
+    description:
+      "Build your foundation in salsa and bachata with Victoria. Beginner-friendly class focused on timing, smooth transitions, and confidence.",
+    shortDescription: "Beginner salsa and bachata every Wednesday at 6:30 PM.",
+    likes: 48,
+    commentsCount: 0,
+    hostName: "Victoria",
+    hostUsername: "queenvictoriuhhh",
+    hostInstagram: "@queenvictoriuhhh",
+    organizerCreatorId: "creator-victoria",
+    category: "class",
+    visibility: "public",
+    pricing: "free",
+    price: 0,
+    comments: [],
+    isLiked: false,
+    isSaved: false,
+    isPinned: false,
+    attendanceStatus: null,
+    activityTypes: ["dance"],
+    audienceTags: ["dance", "class", "free", "public"],
+    linkedSpaceId: "dance",
+    reminderConfig: buildMarioReminderConfig(),
+  },
+  {
+    id: "event-rooftop-social",
+    title: "Sunset Social Rooftop Party",
+    date: dateInDays(7),
+    time: "19:30",
+    endTime: "23:30",
+    location: "Manhattan Rooftop Lounge",
+    image: EVENT_ROOFTOP,
+    images: [EVENT_ROOFTOP],
+    description:
+      "A rooftop social with music, drinks, dancing, and amazing city vibes. A perfect place to meet new people and connect with the community.",
+    shortDescription: "A rooftop social with music, dancing, and city views.",
+    likes: 64,
+    commentsCount: 0,
+    hostName: "DJ Rico",
+    hostUsername: "djriconyc",
+    hostInstagram: "@djriconyc",
+    organizerCreatorId: "creator-official-sv",
+    category: "event",
+    visibility: "public",
+    pricing: "paid",
+    price: 20,
+    paymentMethod: "cash",
+    comments: [],
+    isLiked: false,
+    isSaved: false,
+    isPinned: true,
+    attendanceStatus: null,
+    activityTypes: ["social", "dance"],
+    audienceTags: ["social", "party", "music", "dance", "paid", "public"],
+    linkedSpaceId: "social",
+    ageRule: "18+",
+    reminderConfig: buildMarioReminderConfig(),
+  },
+].map(normalizeEvent)
+
+/* =========================
+   INITIAL PRODUCTS
+========================= */
+
+const INITIAL_PRODUCTS: ProductType[] = [
+  {
+    id: "sv-matching-set-black",
+    name: "SV Matching Set Black",
+    price: 68,
+    kind: "standard",
+    image: PRODUCT_MATCHING_SET_BLACK,
+    images: [PRODUCT_MATCHING_SET_BLACK],
+    category: "sets",
+    sizes: ["XS", "S", "M", "L", "XL"],
+    colors: ["Black"],
+    badge: "Best Seller",
+    description:
+      "A premium black matching set designed for movement, studio sessions, and everyday confidence.",
+    stock: 10,
+    collection: "SV Active",
+    completeTheLookIds: ["sv-core-tee-black"],
+  },
+  {
+    id: "sv-matching-set-burgundy",
+    name: "SV Matching Set Burgundy",
+    price: 68,
+    kind: "standard",
+    image: PRODUCT_MATCHING_SET_BURGUNDY,
+    images: [PRODUCT_MATCHING_SET_BURGUNDY],
+    category: "sets",
+    sizes: ["XS", "S", "M", "L", "XL"],
+    colors: ["Burgundy"],
+    badge: "New",
+    description:
+      "A rich burgundy matching set made for dance, fitness, and premium community style.",
+    stock: 8,
+    collection: "SV Active",
+  },
+  {
+    id: "sv-matching-set-olive",
+    name: "SV Matching Set Olive",
+    price: 68,
+    kind: "standard",
+    image: PRODUCT_MATCHING_SET_OLIVE,
+    images: [PRODUCT_MATCHING_SET_OLIVE],
+    category: "sets",
+    sizes: ["XS", "S", "M", "L", "XL"],
+    colors: ["Olive"],
+    badge: "Limited",
+    description:
+      "A limited olive matching set with a clean activewear look for movement and lifestyle.",
+    stock: 6,
+    collection: "SV Active",
+  },
+  {
+    id: "sv-core-tee-black",
+    name: "SV Core Tee Black",
+    price: 28,
+    image: PRODUCT_CORE_TEE_BLACK,
+    images: [PRODUCT_CORE_TEE_BLACK],
+    category: "tops",
+    sizes: ["S", "M", "L", "XL"],
+    colors: ["Black"],
+    description: "Clean black core tee with Sin Vergüenza energy.",
+    stock: 12,
+  },
+  {
+    id: "sv-core-tee-white",
+    name: "SV Core Tee White",
+    price: 28,
+    image: PRODUCT_CORE_TEE_WHITE,
+    images: [PRODUCT_CORE_TEE_WHITE],
+    category: "tops",
+    sizes: ["S", "M", "L", "XL"],
+    colors: ["White"],
+    description: "Clean white core tee with a premium everyday look.",
+    stock: 12,
+  },
+].map((product, index) => normalizeProduct(product, index))
+/* =========================
+   APP PROVIDER (STATE SETUP)
+========================= */
+
+export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [currentScreen, setCurrentScreen] = useState<Screen>("loading")
+
+  const [user, setUserState] = useState<UserType | null>(INITIAL_USER)
+
+  /* ---------- HOME ---------- */
+  const [homeSelectedDate, setHomeSelectedDate] = useState("today")
+
+  /* ---------- EVENTS ---------- */
+  const [events, setEvents] = useState<EventType[]>(INITIAL_EVENTS)
+  const [selectedEvent, setSelectedEvent] = useState<EventType | null>(null)
+  const [lastEventSource, setLastEventSource] =
+    useState<"home" | "calendar" | null>(null)
+
+  /* ---------- CALENDAR ---------- */
+  const [calendarSearchOpen, setCalendarSearchOpen] = useState(false)
+  const [calendarSearchQuery, setCalendarSearchQuery] = useState("")
+  const [selectedDate, setSelectedDate] = useState(todayDateString())
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth())
+  const [calendarFilters, setCalendarFilters] = useState<string[]>([])
+  const [calendarViewMode, setCalendarViewMode] =
+    useState<CalendarEntryMode>("expand")
+  const [calendarEntrySource, setCalendarEntrySource] =
+    useState<CalendarEntrySource>("calendar")
+  const [calendarHighlightedEventId, setCalendarHighlightedEventId] =
+    useState<string | null>(null)
+
+  /* ---------- SHOP ---------- */
+  const [products, setProductsState] = useState<ProductType[]>(INITIAL_PRODUCTS)
+  const [selectedProduct, setSelectedProduct] =
+    useState<ProductType | null>(null)
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
+
+  /* ---------- CREATORS ---------- */
+  const [creators, setCreatorsState] =
+    useState<Creator[]>(INITIAL_CREATORS)
+  const [selectedCreator, setSelectedCreatorState] =
+    useState<Creator | null>(null)
+
+  /* ---------- COMMUNITY ---------- */
+  const [communityPosts, setCommunityPosts] =
+    useState<CommunityPost[]>(INITIAL_COMMUNITY_POSTS)
+
+  const [communityStories, setCommunityStories] =
+    useState<CommunityStory[]>(INITIAL_COMMUNITY_STORIES)
+
+  /* ---------- SPACES ---------- */
+  const [spaces, setSpaces] = useState<SpaceType[]>(
+    INITIAL_SPACES.map(normalizeSpace)
+  )
+  const [activeSpace, setActiveSpace] =
+    useState<SpaceKey | null>(null)
+
+  /* ---------- STORIES VIEWER ---------- */
+  const [selectedStoryId, setSelectedStoryId] =
+    useState<string | null>(null)
+
+  const [storySource, setStorySource] =
+    useState<"home" | "community" | null>(null)
+
+  /* ---------- CREATOR LIST ---------- */
+  const [creatorListType, setCreatorListType] =
+    useState<CreatorListType>("top-creators")
+
+  const [creatorListTitle, setCreatorListTitle] =
+    useState("Top Creators")
+
+  const [creatorListSourceCreatorId, setCreatorListSourceCreatorId] =
+    useState<string | null>(null)
+
+  /* =========================
+     USER HANDLERS
+  ========================= */
+
+  const setUser = (nextUser: UserType | null) => {
+    setUserState(nextUser)
+
+    if (nextUser) {
+      setCreatorsState((prev) =>
+        upsertMeCreator(prev, nextUser)
+      )
+    }
+  }
+
+  const updateMyProfile = (updates: Partial<UserType>) => {
+    setUserState((prev) => {
+      if (!prev) return prev
+
+      const nextUser: UserType = {
+        ...prev,
+        ...updates,
+        socials: {
+          ...(prev.socials || {}),
+          ...(updates.socials || {}),
+        },
+      }
+
+      setCreatorsState((current) =>
+        upsertMeCreator(current, nextUser)
+      )
+
+      return nextUser
+    })
+  }
+
+  const updateMySocials = (updates: Partial<SocialLinks>) => {
+    updateMyProfile({
+      socials: {
+        ...(user?.socials || {}),
+        ...updates,
+        whatsapp: normalizeWhatsApp(
+          updates.whatsapp || user?.socials?.whatsapp
+        ),
+      },
+    })
+  }
+  /* =========================
+     BASIC SETTERS
+  ========================= */
+
+  const setProducts = (nextProducts: ProductType[]) => {
+    setProductsState(
+      nextProducts.map((product, index) => normalizeProduct(product, index))
+    )
+  }
+
+  const setCreators = (nextCreators: Creator[]) => {
+    setCreatorsState(
+      upsertMeCreator(nextCreators.map(normalizeCreator), user || INITIAL_USER)
+    )
+  }
+
+  const setSelectedCreator = (creator: Creator | null) => {
+    setSelectedCreatorState(creator ? normalizeCreator(creator) : null)
+  }
+
+  /* =========================
+     NAVIGATION
+  ========================= */
+
+  const navigateTo = (screen: Screen) => {
+    setCurrentScreen(screen)
+  }
+
+  const goBack = () => {
+    if (currentScreen === "checkout") {
+      setCurrentScreen("cart")
+      return
+    }
+
+    if (currentScreen === "cart") {
+      setCurrentScreen("shop")
+      return
+    }
+
+    if (currentScreen === "product-detail") {
+      setCurrentScreen("shop")
+      return
+    }
+
+    if (currentScreen === "story-viewer") {
+      setCurrentScreen(storySource === "home" ? "home" : "community")
+      return
+    }
+
+    if (currentScreen === "creator-profile" || currentScreen === "creator-list") {
+      setCurrentScreen("community")
+      return
+    }
+
+    if (currentScreen === "space") {
+      setCurrentScreen("spaces")
+      return
+    }
+
+    if (currentScreen === "create-space") {
+      setCurrentScreen("spaces")
+      return
+    }
+
+    if (currentScreen === "event-detail") {
+      if (lastEventSource === "calendar") {
+        setCurrentScreen("calendar")
+        return
+      }
+
+      setCurrentScreen("home")
+      return
+    }
+
+    if (currentScreen === "settings") {
+      setCurrentScreen("profile")
+      return
+    }
+
+    setCurrentScreen("home")
+  }
+
+  /* =========================
+     CALENDAR OPEN HELPERS
+  ========================= */
+
+  const openPinnedCalendarFocus = () => {
+    const pinnedEvents = events
+      .map(normalizeEvent)
+      .filter((event) => event.isPinned && isFutureOrTodayEvent(event))
+      .sort((a, b) => getEventSortTimestamp(a) - getEventSortTimestamp(b))
+
+    const firstPinned = pinnedEvents[0]
+
+    setCalendarViewMode("focus")
+    setCalendarEntrySource("home-pinned")
+    setCurrentScreen("calendar")
+
+    if (firstPinned) {
+      setSelectedDate(firstPinned.date)
+      setCalendarHighlightedEventId(firstPinned.id)
+    }
+  }
+
+  const openCalendarExpandFromHome = (date?: string) => {
+    setCalendarViewMode("expand")
+    setCalendarEntrySource("home-date")
+    setCalendarHighlightedEventId(null)
+    setSelectedDate(date || todayDateString())
+    setCurrentScreen("calendar")
+  }
+
+  const openEventInCalendar = (
+    eventId: string,
+    mode: CalendarEntryMode = "focus"
+  ) => {
+    const targetEvent = events.find((event) => event.id === eventId)
+    if (!targetEvent) return
+
+    setCalendarViewMode(mode)
+    setCalendarEntrySource("event-detail")
+    setSelectedDate(targetEvent.date)
+    setCalendarHighlightedEventId(targetEvent.id)
+    setCurrentScreen("calendar")
+  }
+  /* =========================
+     EVENT ACTIONS
+  ========================= */
+
+  const createEvent = (event: EventType) => {
+    const normalizedEvent = normalizeEvent({
+      ...event,
+      reminderConfig: event.reminderConfig ?? buildMarioReminderConfig(),
+    })
+
+    setEvents((prev) => [normalizedEvent, ...prev.map(normalizeEvent)])
+
+    setUserState((prev) => {
+      if (!prev) return prev
+
+      return {
+        ...prev,
+        createdEventCount: (prev.createdEventCount ?? 0) + 1,
+      }
+    })
+
+    const threadPost = buildEventThreadPost(
+      normalizedEvent,
+      normalizedEvent.organizerCreatorId || user?.id || "me-user"
+    )
+
+    setCommunityPosts((prev) => [
+      threadPost,
+      ...prev.map(normalizeCommunityPost),
+    ])
+  }
+
+  const updateEvent = (eventId: string, updates: Partial<EventType>) => {
+    setEvents((prev) =>
+      prev.map((event) =>
+        event.id === eventId
+          ? normalizeEvent({ ...event, ...updates })
+          : normalizeEvent(event)
+      )
+    )
+
+    setSelectedEvent((prev) =>
+      prev && prev.id === eventId
+        ? normalizeEvent({ ...prev, ...updates })
+        : prev
+    )
+  }
+
+  const toggleLike = (eventId: string) => {
+    setEvents((prev) =>
+      prev.map((event) =>
+        event.id === eventId
+          ? normalizeEvent({
+              ...event,
+              isLiked: !event.isLiked,
+              likes: (event.likes ?? 0) + (event.isLiked ? -1 : 1),
+            })
+          : normalizeEvent(event)
+      )
+    )
+
+    setSelectedEvent((prev) =>
+      prev && prev.id === eventId
+        ? normalizeEvent({
+            ...prev,
+            isLiked: !prev.isLiked,
+            likes: (prev.likes ?? 0) + (prev.isLiked ? -1 : 1),
+          })
+        : prev
+    )
+  }
+
+  const toggleSave = (eventId: string) => {
+    setEvents((prev) =>
+      prev.map((event) =>
+        event.id === eventId
+          ? normalizeEvent({
+              ...event,
+              isSaved: !event.isSaved,
+            })
+          : normalizeEvent(event)
+      )
+    )
+
+    setSelectedEvent((prev) =>
+      prev && prev.id === eventId
+        ? normalizeEvent({
+            ...prev,
+            isSaved: !prev.isSaved,
+          })
+        : prev
+    )
+  }
+
+  const togglePinEvent = (eventId: string) => {
+    setEvents((prev) =>
+      prev.map((event) =>
+        event.id === eventId
+          ? normalizeEvent({
+              ...event,
+              isPinned: !event.isPinned,
+            })
+          : normalizeEvent(event)
+      )
+    )
+
+    setSelectedEvent((prev) =>
+      prev && prev.id === eventId
+        ? normalizeEvent({
+            ...prev,
+            isPinned: !prev.isPinned,
+          })
+        : prev
+    )
+  }
+
+  const setAttendanceStatus = (
+    eventId: string,
+    status: EventAttendanceStatus
+  ) => {
+    setEvents((prev) =>
+      prev.map((event) =>
+        event.id === eventId
+          ? normalizeEvent({
+              ...event,
+              attendanceStatus:
+                event.attendanceStatus === status ? null : status,
+            })
+          : normalizeEvent(event)
+      )
+    )
+
+    setSelectedEvent((prev) =>
+      prev && prev.id === eventId
+        ? normalizeEvent({
+            ...prev,
+            attendanceStatus:
+              prev.attendanceStatus === status ? null : status,
+          })
+        : prev
+    )
+  }
+
+  const getPinnedEvents = () => {
+    return events
+      .map(normalizeEvent)
+      .filter((event) => event.isPinned && isFutureOrTodayEvent(event))
+      .sort((a, b) => getEventSortTimestamp(a) - getEventSortTimestamp(b))
+      .slice(0, 3)
+  }
+
+  const getSavedEvents = () => {
+    return events
+      .map(normalizeEvent)
+      .filter((event) => event.isSaved && isFutureOrTodayEvent(event))
+      .sort((a, b) => getEventSortTimestamp(a) - getEventSortTimestamp(b))
+  }
+
+  const getGoingEvents = () => {
+    return events
+      .map(normalizeEvent)
+      .filter(
+        (event) =>
+          event.attendanceStatus === "going" && isFutureOrTodayEvent(event)
+      )
+      .sort((a, b) => getEventSortTimestamp(a) - getEventSortTimestamp(b))
+  }
+
+  const addComment = (eventId: string, text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+
+    const newComment: EventComment = {
+      id: `event-comment-${Date.now()}`,
+      userName: user?.name || "Mario",
+      text: trimmed,
+      createdAt: new Date().toISOString(),
+      replies: [],
+    }
+
+    setEvents((prev) =>
+      prev.map((event) =>
+        event.id === eventId
+          ? normalizeEvent({
+              ...event,
+              comments: [...normalizeComments(event.comments), newComment],
+              commentsCount: (event.commentsCount ?? 0) + 1,
+            })
+          : normalizeEvent(event)
+      )
+    )
+  }
+
+  const addReplyToComment = (
+    eventId: string,
+    commentId: string,
+    text: string
+  ) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+
+    const newReply: EventCommentReply = {
+      id: `event-reply-${Date.now()}`,
+      userName: user?.name || "Mario",
+      text: trimmed,
+      createdAt: new Date().toISOString(),
+    }
+
+    setEvents((prev) =>
+      prev.map((event) => {
+        if (event.id !== eventId) return normalizeEvent(event)
+
+        const comments = normalizeComments(event.comments).map((comment) =>
+          comment.id === commentId
+            ? {
+                ...comment,
+                replies: [...(comment.replies ?? []), newReply],
+              }
+            : comment
+        )
+
+        return normalizeEvent({
+          ...event,
+          comments,
+        })
+      })
+    )
+  }
+  /* =========================
+     CREATOR ACTIONS
+  ========================= */
+
+  const openCreatorProfile = (creatorId: string) => {
+    const creator = creators.find((item) => item.id === creatorId)
+    if (!creator) return
+
+    setSelectedCreatorState(normalizeCreator(creator))
+    setCurrentScreen("creator-profile")
+  }
+
+  const toggleFollow = (id: string) => {
+    setCreatorsState((prev) =>
+      prev.map((creator) => {
+        if (creator.id !== id) return normalizeCreator(creator)
+
+        const nextFollowing = !creator.isFollowing
+        const followersCount = creator.followersCount ?? creator.followers ?? 0
+
+        return normalizeCreator({
+          ...creator,
+          isFollowing: nextFollowing,
+          followersCount: nextFollowing
+            ? followersCount + 1
+            : Math.max(0, followersCount - 1),
+          followers: nextFollowing
+            ? followersCount + 1
+            : Math.max(0, followersCount - 1),
+        })
+      })
+    )
+
+    setSelectedCreatorState((prev) => {
+      if (!prev || prev.id !== id) return prev
+
+      const nextFollowing = !prev.isFollowing
+      const followersCount = prev.followersCount ?? prev.followers ?? 0
+
+      return normalizeCreator({
+        ...prev,
+        isFollowing: nextFollowing,
+        followersCount: nextFollowing
+          ? followersCount + 1
+          : Math.max(0, followersCount - 1),
+        followers: nextFollowing
+          ? followersCount + 1
+          : Math.max(0, followersCount - 1),
+      })
+    })
+  }
+
+  const getTopCreators = () => {
+    return creators
+      .map(normalizeCreator)
+      .sort((a, b) => (b.followersCount ?? 0) - (a.followersCount ?? 0))
+      .slice(0, 10)
+  }
+
+  const getCreatorFollowers = (creatorId: string) => {
+    return creators
+      .map(normalizeCreator)
+      .filter((creator) => creator.id !== creatorId)
+      .slice(0, 25)
+  }
+
+  const getCreatorFollowing = (creatorId: string) => {
+    return creators
+      .map(normalizeCreator)
+      .filter((creator) => creator.isFollowing)
+      .slice(0, 25)
+  }
+
+  const getCreatorEvents = (creatorId: string) => {
+    return events
+      .map(normalizeEvent)
+      .filter((event) => event.organizerCreatorId === creatorId)
+      .sort((a, b) => getEventSortTimestamp(a) - getEventSortTimestamp(b))
+  }
+
+  const openCreatorList = (
+    type: CreatorListType,
+    creatorId?: string | null,
+    title?: string
+  ) => {
+    setCreatorListType(type)
+    setCreatorListSourceCreatorId(creatorId || null)
+
+    if (title) {
+      setCreatorListTitle(title)
+    } else {
+      if (type === "followers") setCreatorListTitle("Followers")
+      else if (type === "following") setCreatorListTitle("Following")
+      else setCreatorListTitle("Top Creators")
+    }
+
+    setCurrentScreen("creator-list")
+  }
+
+  /* =========================
+     COMMUNITY ACTIONS
+  ========================= */
+
+  const createCommunityPost = (input: CreateCommunityPostInput) => {
+    const id = `post-${Date.now()}`
+    const createdAt = new Date().toISOString()
+
+    if (input.type === "story") {
+      const newStory: CommunityStory = normalizeStory({
+        id,
+        authorId: user?.id || "me-user",
+        type: "story",
+        content: input.content,
+        image: input.image,
+        createdAt,
+        expiresAt: makeDateIn(24),
+        storyViewMode: input.storyViewMode || "internal",
+        audience: input.audience || "public",
+        slides:
+          input.slides && input.slides.length > 0
+            ? input.slides
+            : [
+                {
+                  id: `${id}-slide-1`,
+                  type: "image",
+                  image: input.image || DEFAULT_ASSET,
+                  content: input.content,
+                  createdAt,
+                },
+              ],
+        media: input.media,
+      })
+
+      setCommunityStories((prev) => [newStory, ...prev.map(normalizeStory)])
+      return
+    }
+
+    const newPost: CommunityPost = normalizeCommunityPost({
+      id,
+      authorId: user?.id || "me-user",
+type: input.type === "poll" ? "poll" : input.type === "video" ? "video" : "post",
+      content: input.content,
+      image: input.image,
+      mediaType: input.type === "video" ? "video" : "image",
+      mediaUrl: input.image,
+      thumbnailUrl: input.image,
+      createdAt,
+      expiresAt: sevenDaysFromNow(),
+      likes: 0,
+      isLiked: false,
+      comments: [],
+      instagramUrl: input.instagramUrl,
+      pollOptions:
+        input.type === "poll" && input.pollOptions
+          ? input.pollOptions.map((text, index) => ({
+              id: `${id}-option-${index + 1}`,
+              text,
+              votes: 0,
+            }))
+          : undefined,
+      spaceKey: input.spaceKey ?? null,
+      tags: [],
+    })
+
+    setCommunityPosts((prev) => [newPost, ...prev.map(normalizeCommunityPost)])
+  }
+  const toggleCommunityLike = (postId: string) => {
+    setCommunityPosts((prev) =>
+      prev.map((post) =>
+        post.id === postId
+          ? normalizeCommunityPost({
+              ...post,
+              isLiked: !post.isLiked,
+              likes: post.isLiked
+                ? Math.max(0, post.likes - 1)
+                : post.likes + 1,
+            })
+          : normalizeCommunityPost(post)
+      )
+    )
+  }
+
+  const addCommunityComment = (postId: string, text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+
+    const newComment: CommunityComment = {
+      id: `comment-${Date.now()}`,
+      authorId: user?.id || "me-user",
+      authorName: user?.name || "Mario",
+      authorAvatar: user?.avatar || DEFAULT_ASSET,
+      content: trimmed,
+      createdAt: new Date().toISOString(),
+      replies: [],
+    }
+
+    setCommunityPosts((prev) =>
+      prev.map((post) =>
+        post.id === postId
+          ? normalizeCommunityPost({
+              ...post,
+              comments: [...post.comments, newComment],
+            })
+          : normalizeCommunityPost(post)
+      )
+    )
+  }
+
+  const addCommunityReply = (
+    postId: string,
+    commentId: string,
+    text: string
+  ) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+
+    const newReply: CommunityReply = {
+      id: `reply-${Date.now()}`,
+      authorId: user?.id || "me-user",
+      authorName: user?.name || "Mario",
+      authorAvatar: user?.avatar || DEFAULT_ASSET,
+      content: trimmed,
+      createdAt: new Date().toISOString(),
+    }
+
+    setCommunityPosts((prev) =>
+      prev.map((post) => {
+        if (post.id !== postId) return normalizeCommunityPost(post)
+
+        return normalizeCommunityPost({
+          ...post,
+          comments: post.comments.map((comment) =>
+            comment.id === commentId
+              ? {
+                  ...comment,
+                  replies: [...comment.replies, newReply],
+                }
+              : comment
+          ),
+        })
+      })
+    )
+  }
+
+  const voteOnPoll = (postId: string, optionId: string) => {
+    setCommunityPosts((prev) =>
+      prev.map((post) => {
+        if (post.id !== postId || post.type !== "poll" || !post.pollOptions) {
+          return normalizeCommunityPost(post)
+        }
+
+        if (post.selectedPollOptionId) return normalizeCommunityPost(post)
+
+        return normalizeCommunityPost({
+          ...post,
+          selectedPollOptionId: optionId,
+          pollOptions: post.pollOptions.map((option) =>
+            option.id === optionId
+              ? {
+                  ...option,
+                  votes: option.votes + 1,
+                }
+              : option
+          ),
+        })
+      })
+    )
+  }
+
+  /* =========================
+     STORY ACTIONS
+  ========================= */
+
+  const getStoriesForSource = (source: "home" | "community") => {
+    const myUserId = user?.id || "me-user"
+
+    const followingCreatorIds = new Set(
+      creators
+        .filter((creator) => creator.isFollowing)
+        .map((creator) => creator.id)
+    )
+
+    const activeStories = communityStories
+      .map(normalizeStory)
+      .filter((story) => !isStoryExpired(story))
+      .filter((story) => {
+        if (source === "home") {
+          const isMine = story.authorId === myUserId
+          const isFollowing = followingCreatorIds.has(story.authorId)
+
+          if (isMine) return true
+
+          return (
+            isFollowing &&
+            (story.audience === "followers" || story.audience === "both")
+          )
+        }
+
+        return story.audience === "public" || story.audience === "both"
+      })
+
+    const latestPerAuthor = new Map<string, CommunityStory>()
+
+    activeStories.forEach((story) => {
+      const existing = latestPerAuthor.get(story.authorId)
+
+      if (
+        !existing ||
+        getStorySortTimestamp(story) > getStorySortTimestamp(existing)
+      ) {
+        latestPerAuthor.set(story.authorId, story)
+      }
+    })
+
+    const stories = Array.from(latestPerAuthor.values())
+
+    const ensuredMarioStory =
+      source === "home" && !stories.some((story) => story.authorId === myUserId)
+        ? [
+            normalizeStory({
+              id: "story-mario-placeholder",
+              authorId: myUserId,
+              type: "story",
+              content: "Your Story",
+              image: user?.avatar || DEFAULT_ASSET,
+              createdAt: new Date().toISOString(),
+              expiresAt: makeDateIn(24),
+              instagramUrl: user?.socials?.instagram,
+              storyViewMode: "internal",
+              audience: "both",
+              seenByMe: false,
+              likesCount: 0,
+              isLiked: false,
+              slides: [
+                {
+                  id: "story-mario-placeholder-slide-1",
+                  type: "image",
+                  image: user?.avatar || DEFAULT_ASSET,
+                  content: "Your Story",
+                  createdAt: new Date().toISOString(),
+                },
+              ],
+              quickReactions: {},
+              myReaction: null,
+              replies: [],
+            }),
+            ...stories,
+          ]
+        : stories
+
+    return sortStoriesForSource(ensuredMarioStory, source, myUserId)
+  }
+
+  const markStorySeen = (storyId: string) => {
+    setCommunityStories((prev) =>
+      prev.map((story) =>
+        story.id === storyId
+          ? normalizeStory({
+              ...story,
+              seenByMe: true,
+            })
+          : normalizeStory(story)
+      )
+    )
+  }
+
+  const toggleStoryLike = (storyId: string) => {
+    setCommunityStories((prev) =>
+      prev.map((story) =>
+        story.id === storyId
+          ? normalizeStory({
+              ...story,
+              isLiked: !story.isLiked,
+              likesCount: (story.likesCount ?? 0) + (story.isLiked ? -1 : 1),
+            })
+          : normalizeStory(story)
+      )
+    )
+  }
+
+  const addStoryReply = (storyId: string, text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+
+    const newReply: StoryReply = {
+      id: `story-reply-${Date.now()}`,
+      authorId: user?.id || "me-user",
+      authorName: user?.name || "Mario",
+      authorAvatar: user?.avatar || DEFAULT_ASSET,
+      text: trimmed,
+      createdAt: new Date().toISOString(),
+    }
+
+    setCommunityStories((prev) =>
+      prev.map((story) =>
+        story.id === storyId
+          ? normalizeStory({
+              ...story,
+              replies: [...(story.replies ?? []), newReply],
+            })
+          : normalizeStory(story)
+      )
+    )
+  }
+
+  const setStoryReaction = (storyId: string, reaction: StoryReaction) => {
+    setCommunityStories((prev) =>
+      prev.map((story) => {
+        if (story.id !== storyId) return normalizeStory(story)
+
+        const nextQuickReactions = {
+          "❤️": story.quickReactions?.["❤️"] ?? 0,
+          "🔥": story.quickReactions?.["🔥"] ?? 0,
+          "👏": story.quickReactions?.["👏"] ?? 0,
+          "🕺🏾": story.quickReactions?.["🕺🏾"] ?? 0,
+          "💃": story.quickReactions?.["💃"] ?? 0,
+          "😎": story.quickReactions?.["😎"] ?? 0,
+          "🤣": story.quickReactions?.["🤣"] ?? 0,
+        }
+
+        if (story.myReaction) {
+          nextQuickReactions[story.myReaction] = Math.max(
+            0,
+            (nextQuickReactions[story.myReaction] ?? 0) - 1
+          )
+        }
+
+        const isSameReaction = story.myReaction === reaction
+
+        if (isSameReaction) {
+          return normalizeStory({
+            ...story,
+            myReaction: null,
+            quickReactions: nextQuickReactions,
+          })
+        }
+
+        nextQuickReactions[reaction] =
+          (nextQuickReactions[reaction] ?? 0) + 1
+
+        return normalizeStory({
+          ...story,
+          myReaction: reaction,
+          quickReactions: nextQuickReactions,
+        })
+      })
+    )
+  }
+
+  const openStory = (storyId: string, source: "home" | "community") => {
+    const exists = communityStories.some((story) => story.id === storyId)
+
+    if (exists) {
+      markStorySeen(storyId)
+    }
+
+    setSelectedStoryId(storyId)
+    setStorySource(source)
+    setCurrentScreen("story-viewer")
+  }
+  /* =========================
+     SPACE ACTIONS
+  ========================= */
+
+  const getSpaceFreshness = (space: SpaceType): SpaceFreshness => {
+    return getSpaceFreshnessFromDates(space.createdAt, space.expiresAt)
+  }
+
+  const openSpace = (space: SpaceKey) => {
+    setActiveSpace(space)
+    setCurrentScreen("space")
+  }
+
+  const requestJoinSpace = (space: SpaceKey) => {
+    setSpaces((prev) =>
+      prev.map((item) =>
+        item.key === space
+          ? normalizeSpace({
+              ...item,
+              requestStatus: item.requestStatus === "pending" ? "none" : "pending",
+              isJoined: false,
+            })
+          : normalizeSpace(item)
+      )
+    )
+  }
+
+  const toggleJoinSpace = (space: SpaceKey) => {
+    setSpaces((prev) =>
+      prev.map((item) => {
+        if (item.key !== space) return normalizeSpace(item)
+
+        if (item.visibility === "private" && !item.isJoined) {
+          return normalizeSpace({
+            ...item,
+            requestStatus: "pending",
+            isJoined: false,
+          })
+        }
+
+        const nextJoined = !item.isJoined
+
+        return normalizeSpace({
+          ...item,
+          isJoined: nextJoined,
+          requestStatus: nextJoined ? "approved" : "none",
+          membersCount: nextJoined
+            ? item.membersCount + 1
+            : Math.max(0, item.membersCount - 1),
+        })
+      })
+    )
+  }
+
+  const getSpaceLimitInfo = () => buildSpaceLimitInfo(user)
+
+  const createSpace = (input: CreateSpaceInput) => {
+    const limitInfo = buildSpaceLimitInfo(user)
+    if (!limitInfo.canCreateMore) return false
+
+    const key: SpaceKey =
+      input.linkedEventId ? "events" : input.visibility === "private" ? "private" : "general"
+
+    const newSpace: SpaceType = normalizeSpace({
+      key,
+      label: input.label.trim() || "New Space",
+      emoji: input.emoji.trim() || "💬",
+      description: input.description.trim() || "A fresh community space.",
+      membersCount: 1,
+      topicsCount: 0,
+      isJoined: true,
+      visibility: input.visibility,
+      requestStatus: "approved",
+      linkedEventId: input.linkedEventId,
+      createdAt: new Date().toISOString(),
+      expiresAt: sevenDaysFromNow(),
+    })
+
+    setSpaces((prev) => [newSpace, ...prev.map(normalizeSpace)])
+
+    setUserState((prev) =>
+      prev
+        ? {
+            ...prev,
+            createdSpaceCount: (prev.createdSpaceCount ?? 0) + 1,
+          }
+        : prev
+    )
+
+    return true
+  }
+
+  const getSpacePosts = (space: SpaceKey | null) => {
+    return communityPosts
+      .map(normalizeCommunityPost)
+      .filter((post) => (space ? post.spaceKey === space : true))
+      .filter((post) => !post.expiresAt || !isExpired(post.expiresAt))
+      .filter((post) => isFreshWithin7Days(post.createdAt))
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
+  }
+
+  /* =========================
+     CART ACTIONS
+  ========================= */
+
+  const addToCart = ({
+    product,
+    size,
+    color,
+    quantity,
+  }: {
+    product: ProductType
+    size: string
+    color: string
+    quantity: number
+  }) => {
+    const normalizedProduct = normalizeProduct(product, product.sortOrder ?? 0)
+
+    const productImage =
+      normalizedProduct.featuredImage ||
+      normalizedProduct.image ||
+      normalizedProduct.images?.[0] ||
+      DEFAULT_ASSET
+
+    setCartItems((prev) => {
+      const existing = prev.find(
+        (item) =>
+          item.productId === normalizedProduct.id &&
+          item.size === size &&
+          item.color === color
+      )
+
+      if (existing) {
+        return prev.map((item) =>
+          item.id === existing.id
+            ? { ...item, quantity: item.quantity + quantity }
+            : item
+        )
+      }
+
+      return [
+        ...prev,
+        {
+          id: `cart-${Date.now()}`,
+          productId: normalizedProduct.id,
+          productName: normalizedProduct.name,
+          productImage,
+          size,
+          color,
+          quantity,
+          price: normalizedProduct.price,
+        },
+      ]
+    })
+  }
+
+  const removeFromCart = (id: string) => {
+    setCartItems((prev) => prev.filter((item) => item.id !== id))
+  }
+
+  const updateCartQuantity = (id: string, qty: number) => {
+    if (qty <= 0) {
+      removeFromCart(id)
+      return
+    }
+
+    setCartItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, quantity: qty } : item))
+    )
+  }
+
+  const clearCart = () => {
+    setCartItems([])
+  }
+
+  const cartSubtotal = useMemo(
+    () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [cartItems]
+  )
+
+  const cartShipping = cartItems.length > 0 && cartSubtotal < 75 ? 8 : 0
+  const cartTotal = cartSubtotal + cartShipping
+
+  /* =========================
+     NOTIFICATIONS
+  ========================= */
+
+  const [notifications, setNotifications] = useState<NotificationItem[]>([
+    {
+      id: "notification-event-1",
+      type: "events",
+      title: "Bachata con Flow",
+      message: "Your pinned event is coming up soon.",
+      createdAt: makeDateAgo(2),
+      isRead: false,
+      targetType: "event",
+      targetId: "event-sv-bachata-flow",
+      image: EVENT_SV_BACHATA_FLOW,
+    },
+    {
+      id: "notification-space-1",
+      type: "spaces",
+      title: "Dance Space is active",
+      message: "New conversations are happening in Dance.",
+      createdAt: makeDateAgo(5),
+      isRead: false,
+      targetType: "space",
+      targetId: "dance",
+    },
+    {
+      id: "notification-shop-1",
+      type: "store",
+      title: "SV Matching Set",
+      message: "Black matching set is trending.",
+      createdAt: makeDateAgo(10),
+      isRead: true,
+      targetType: "product",
+      targetId: "sv-matching-set-black",
+      image: PRODUCT_MATCHING_SET_BLACK,
+    },
+  ])
+
+  const [selectedNotification, setSelectedNotification] =
+    useState<NotificationItem | null>(null)
+
+  const markNotificationRead = (notificationId: string) => {
+    setNotifications((prev) =>
+      prev.map((notification) =>
+        notification.id === notificationId
+          ? { ...notification, isRead: true }
+          : notification
+      )
+    )
+  }
+
+  const markAllNotificationsRead = () => {
+    setNotifications((prev) =>
+      prev.map((notification) => ({ ...notification, isRead: true }))
+    )
+  }
+
+  const openNotificationTarget = (notification: NotificationItem) => {
+    setSelectedNotification(notification)
+    markNotificationRead(notification.id)
+
+    if (notification.targetType === "event" && notification.targetId) {
+      const event = events.find((item) => item.id === notification.targetId)
+      if (event) {
+        setSelectedEvent(event)
+        setLastEventSource("calendar")
+        setCurrentScreen("event-detail")
+      }
+      return
+    }
+
+    if (notification.targetType === "space" && notification.targetId) {
+      openSpace(notification.targetId as SpaceKey)
+      return
+    }
+
+    if (notification.targetType === "creator" && notification.targetId) {
+      openCreatorProfile(notification.targetId)
+      return
+    }
+
+    if (notification.targetType === "product" && notification.targetId) {
+      const product = products.find((item) => item.id === notification.targetId)
+      if (product) {
+        setSelectedProduct(product)
+        setCurrentScreen("product-detail")
+      }
+      return
+    }
+
+    if (
+      (notification.targetType === "community-post" ||
+        notification.targetType === "event-thread") &&
+      notification.targetId
+    ) {
+      setCurrentScreen("community")
+      return
+    }
+
+    setCurrentScreen("notifications")
+  }
+
+  /* =========================
+     CONTEXT VALUE
+  ========================= */
+
+  return (
+    <AppContext.Provider
+      value={{
+        currentScreen,
+        setCurrentScreen,
+        navigateTo,
+        goBack,
+
+        user,
+        setUser,
+        updateMyProfile,
+        updateMySocials,
+
+        homeSelectedDate,
+        setHomeSelectedDate,
+
+        events,
+        selectedEvent,
+        setSelectedEvent,
+        lastEventSource,
+        setLastEventSource,
+
+        createEvent,
+        updateEvent,
+        toggleLike,
+        toggleSave,
+        togglePinEvent,
+        setAttendanceStatus,
+
+        getPinnedEvents,
+        getSavedEvents,
+        getGoingEvents,
+
+        openPinnedCalendarFocus,
+        openCalendarExpandFromHome,
+        openEventInCalendar,
+
+        addComment,
+        addReplyToComment,
+
+        calendarSearchOpen,
+        setCalendarSearchOpen,
+        calendarSearchQuery,
+        setCalendarSearchQuery,
+
+        selectedDate,
+        setSelectedDate,
+        currentMonth,
+        setCurrentMonth,
+        calendarFilters,
+        setCalendarFilters,
+        calendarViewMode,
+        setCalendarViewMode,
+        calendarEntrySource,
+        setCalendarEntrySource,
+        calendarHighlightedEventId,
+        setCalendarHighlightedEventId,
+
+        products,
+        setProducts,
+        selectedProduct,
+        setSelectedProduct,
+
+        cartItems,
+        addToCart,
+        removeFromCart,
+        updateCartQuantity,
+        clearCart,
+        cartSubtotal,
+        cartShipping,
+        cartTotal,
+
+        creators,
+        setCreators,
+        selectedCreator,
+        setSelectedCreator,
+        openCreatorProfile,
+        toggleFollow,
+
+        creatorListType,
+        creatorListTitle,
+        openCreatorList,
+        getTopCreators,
+        getCreatorFollowers,
+        getCreatorFollowing,
+        getCreatorEvents,
+
+        communityPosts,
+        communityStories,
+        createCommunityPost,
+        toggleCommunityLike,
+        addCommunityComment,
+        addCommunityReply,
+        voteOnPoll,
+
+        getStoriesForSource,
+        markStorySeen,
+        toggleStoryLike,
+        addStoryReply,
+        setStoryReaction,
+
+        selectedStoryId,
+        setSelectedStoryId,
+        storySource,
+        openStory,
+
+        spaces,
+        activeSpace,
+        setActiveSpace,
+        openSpace,
+        toggleJoinSpace,
+        requestJoinSpace,
+        createSpace,
+        getSpaceLimitInfo,
+        getSpacePosts,
+        getSpaceFreshness,
+
+        notifications,
+        markNotificationRead,
+        markAllNotificationsRead,
+        openNotificationTarget,
+        selectedNotification,
+        setSelectedNotification,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  )
+}
+
+/* =========================
+   HOOK
+========================= */
+
+export const useApp = () => {
+  const context = useContext(AppContext)
+
+  if (!context) {
+    throw new Error("useApp must be used inside AppProvider")
+  }
+
+  return context
+}

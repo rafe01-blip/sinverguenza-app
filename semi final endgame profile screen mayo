@@ -1,0 +1,847 @@
+"use client"
+
+import { useMemo, useState, type ReactNode } from "react"
+import {
+  Settings,
+  Share2,
+  Instagram,
+  BadgeCheck,
+  Facebook,
+  MessageCircle,
+  Globe,
+  Music2,
+} from "lucide-react"
+import { TopHeader } from "@/components/navigation/top-header"
+import { BottomNav } from "@/components/navigation/bottom-nav"
+import { useApp } from "@/lib/app-context"
+
+const GOLD = "#C9A84C"
+const DARK = "#0A0A0A"
+const CARD = "#121212"
+
+type ProfileTab = "posts" | "events" | "saved"
+
+function compact(n: number) {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
+  return `${n}`
+}
+
+export function ProfileScreen() {
+  const {
+    user,
+    creators,
+    communityPosts,
+    events,
+    setCurrentScreen,
+  } = useApp()
+
+  const [activeTab, setActiveTab] = useState<ProfileTab>("posts")
+  const [showSocials, setShowSocials] = useState(false)
+
+  const myCreator = useMemo(() => {
+    if (!user) return null
+
+    const exact = creators.find((creator) => creator.id === user.id)
+    if (exact) return exact
+
+    const byUsername =
+      user.username
+        ? creators.find((creator) => creator.username === user.username)
+        : null
+
+    if (byUsername) return byUsername
+
+    return null
+  }, [creators, user])
+
+  const myPosts = useMemo(() => {
+    if (!user) return []
+    return communityPosts.filter((post) => post.authorId === user.id)
+  }, [communityPosts, user])
+
+  const savedEvents = useMemo(() => {
+    return events.filter((event) => event.isSaved)
+  }, [events])
+
+  const likedEvents = useMemo(() => {
+    return events.filter((event) => event.isLiked)
+  }, [events])
+
+  const myEvents = useMemo(() => {
+    if (!user) return []
+    return events.filter(
+      (event) =>
+        event.organizerCreatorId === user.id ||
+        event.hostUsername === user.username
+    )
+  }, [events, user])
+
+  const followerCount =
+    myCreator?.followersCount ??
+    myCreator?.followers ??
+    120
+
+  const followingCount =
+    myCreator?.followingCount ??
+    myCreator?.following ??
+    80
+
+  const postsCount =
+    myCreator?.postsCount ??
+    myCreator?.posts ??
+    myPosts.length
+
+  const eventsCount =
+    myCreator?.eventsCount ??
+    myCreator?.events ??
+    myEvents.length
+
+  const profileName = user?.name || "Mario Rosario"
+  const profileUsername = user?.username || "mariorafaelrosario"
+  const profileBio = user?.bio || "Passion for dance and community ✨"
+  const profileAvatar = user?.avatar || "/placeholder.svg"
+  const profileCover = user?.coverImage || "/placeholder.svg"
+  const profileRole = user?.role || "Member"
+  const socials = user?.socials || {}
+
+  const socialItems = [
+    socials.instagram
+      ? {
+          key: "instagram",
+          label: "Instagram",
+          icon: <Instagram size={18} />,
+          url: socials.instagram,
+        }
+      : null,
+    socials.facebook
+      ? {
+          key: "facebook",
+          label: "Facebook",
+          icon: <Facebook size={18} />,
+          url: socials.facebook,
+        }
+      : null,
+    socials.tiktok
+      ? {
+          key: "tiktok",
+          label: "TikTok",
+          icon: <Music2 size={18} />,
+          url: socials.tiktok,
+        }
+      : null,
+    socials.whatsapp
+      ? {
+          key: "whatsapp",
+          label: "WhatsApp",
+          icon: <MessageCircle size={18} />,
+          url: socials.whatsapp,
+        }
+      : null,
+    socials.website
+      ? {
+          key: "website",
+          label: "Website",
+          icon: <Globe size={18} />,
+          url: socials.website,
+        }
+      : null,
+    socials.x
+      ? {
+          key: "x",
+          label: "X",
+          icon: <span style={{ fontWeight: 900 }}>X</span>,
+          url: socials.x,
+        }
+      : null,
+  ].filter(Boolean) as {
+    key: string
+    label: string
+    icon: ReactNode
+    url: string
+  }[]
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: DARK,
+        color: "#fff",
+        paddingBottom: 96,
+      }}
+    >
+      <TopHeader title="Profile" />
+
+      <div style={{ position: "relative" }}>
+        <div style={coverWrap}>
+          <img
+            src={profileCover}
+            alt="Cover"
+            style={coverImg}
+          />
+          <div style={coverOverlay} />
+        </div>
+
+        <button
+          onClick={() => setCurrentScreen("settings")}
+          style={settingsBtn}
+        >
+          <Settings size={20} />
+        </button>
+
+        <div style={profileImgWrap}>
+          <img
+            src={profileAvatar}
+            alt="Profile"
+            style={profileImg}
+          />
+        </div>
+      </div>
+
+      <div style={{ padding: "74px 16px 16px", textAlign: "center" }}>
+        <div style={nameRow}>
+          <div style={{ fontSize: 24, fontWeight: 900 }}>
+            {profileName}
+          </div>
+
+          <BadgeCheck size={18} color={GOLD} />
+        </div>
+
+        <div style={{ color: "#aaa", marginBottom: 8 }}>
+          @{profileUsername}
+        </div>
+
+        <div style={rolePill}>
+          {profileRole}
+        </div>
+
+        <div style={bioText}>
+          {profileBio}
+        </div>
+      </div>
+
+      <div style={statsRow}>
+        <button style={statBox}>
+          <div style={statNumber}>{compact(followerCount)}</div>
+          <div style={statLabel}>Followers</div>
+        </button>
+
+        <button style={statBox}>
+          <div style={statNumber}>{compact(followingCount)}</div>
+          <div style={statLabel}>Following</div>
+        </button>
+
+        <button style={statBox}>
+          <div style={statNumber}>{compact(postsCount)}</div>
+          <div style={statLabel}>Posts</div>
+        </button>
+
+        <button style={statBox}>
+          <div style={statNumber}>{compact(eventsCount)}</div>
+          <div style={statLabel}>Events</div>
+        </button>
+      </div>
+
+      <div style={actionsRow}>
+        <button
+          onClick={() => setCurrentScreen("settings")}
+          style={primaryActionBtn}
+        >
+          Edit
+        </button>
+
+        <button
+          onClick={() => setShowSocials(true)}
+          style={secondaryActionBtn}
+        >
+          Socials
+        </button>
+
+        <button style={iconActionBtn}>
+          <Share2 size={16} />
+        </button>
+      </div>
+
+      <div style={sectionCard}>
+        <div style={sectionTitle}>My World</div>
+
+        <div style={activityGrid}>
+          <div style={activityBox}>
+            <div style={activityNumber}>{myEvents.length || 14}</div>
+            <div style={activityLabel}>Events attended</div>
+          </div>
+
+          <div style={activityBox}>
+            <div style={activityNumber}>{savedEvents.length || 6}</div>
+            <div style={activityLabel}>Saved items</div>
+          </div>
+
+          <div style={activityBox}>
+            <div style={activityNumber}>{myPosts.length || 8}</div>
+            <div style={activityLabel}>Posts created</div>
+          </div>
+
+          <div style={activityBox}>
+            <div style={activityNumber}>{likedEvents.length || 10}</div>
+            <div style={activityLabel}>Liked events</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={sectionCard}>
+        <div style={sectionTitle}>Bridge</div>
+
+        <div style={bridgeText}>
+          Your profile connects your activity inside the app with your real social presence outside the app.
+        </div>
+
+        <div style={bridgeMiniRow}>
+          <div style={bridgeMiniPill}>
+            community
+          </div>
+          <div style={bridgeMiniPill}>
+            creators
+          </div>
+          <div style={bridgeMiniPill}>
+            events
+          </div>
+          <div style={bridgeMiniPill}>
+            socials
+          </div>
+        </div>
+      </div>
+
+      <div style={tabsRow}>
+        {["posts", "events", "saved"].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab as ProfileTab)}
+            style={activeTab === tab ? tabActive : tabBtn}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "posts" && (
+        <div style={postsWrap}>
+          {myPosts.length === 0 ? (
+            <div style={emptyWrap}>
+              <div style={emptyTitle}>No posts yet</div>
+              <div style={emptyText}>
+                Your community posts will appear here.
+              </div>
+            </div>
+          ) : (
+            <div style={grid}>
+              {myPosts.slice(0, 9).map((post) => (
+                <div key={post.id} style={gridItem}>
+                  {post.image ? (
+                    <img
+                      src={post.image}
+                      alt="Post"
+                      style={gridImage}
+                    />
+                  ) : (
+                    <div style={gridFallbackText}>
+                      {post.content.slice(0, 42)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "events" && (
+        <div style={{ padding: 16 }}>
+          {myEvents.length === 0 ? (
+            <div style={emptyWrap}>
+              <div style={emptyTitle}>No events yet</div>
+              <div style={emptyText}>
+                Events linked to your profile will show here.
+              </div>
+            </div>
+          ) : (
+            myEvents.map((event) => (
+              <div key={event.id} style={card}>
+                <div style={{ fontWeight: 900, marginBottom: 4 }}>
+                  {event.title}
+                </div>
+
+                <div style={{ color: "#aaa", fontSize: 13 }}>
+                  {event.date} • {event.time}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {activeTab === "saved" && (
+        <div style={{ padding: 16 }}>
+          {savedEvents.length === 0 ? (
+            <div style={emptyWrap}>
+              <div style={emptyTitle}>No saved items yet</div>
+              <div style={emptyText}>
+                Saved events and selected items will appear here.
+              </div>
+            </div>
+          ) : (
+            savedEvents.map((event) => (
+              <div key={event.id} style={card}>
+                <div style={{ fontWeight: 900, marginBottom: 4 }}>
+                  {event.title}
+                </div>
+
+                <div style={{ color: "#aaa", fontSize: 13 }}>
+                  {event.date} • {event.time}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {showSocials && (
+        <div style={modalOverlay} onClick={() => setShowSocials(false)}>
+          <div style={socialsModal} onClick={(e) => e.stopPropagation()}>
+            <div style={socialsModalHeader}>
+              <div style={socialsModalTitle}>Socials</div>
+
+              <button
+                onClick={() => setShowSocials(false)}
+                style={closeBtn}
+              >
+                ✕
+              </button>
+            </div>
+
+            {socialItems.length === 0 ? (
+              <div style={emptyWrapSmall}>
+                <div style={emptyTitleSmall}>No socials connected</div>
+                <div style={emptyTextSmall}>
+                  Add your social links in Settings.
+                </div>
+              </div>
+            ) : (
+              <div style={socialsGrid}>
+                {socialItems.map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => window.open(item.url, "_blank")}
+                    style={socialIconBtn}
+                  >
+                    <div style={socialIconCircle}>{item.icon}</div>
+                    <div style={socialIconLabel}>{item.label}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <BottomNav />
+    </div>
+  )
+}
+
+const coverWrap = {
+  height: 220,
+  overflow: "hidden",
+  background: "#222",
+  position: "relative" as const,
+}
+
+const coverImg = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover" as const,
+  display: "block",
+}
+
+const coverOverlay = {
+  position: "absolute" as const,
+  inset: 0,
+  background: "linear-gradient(180deg, rgba(0,0,0,0.06) 0%, rgba(10,10,10,0.62) 100%)",
+}
+
+const profileImgWrap = {
+  position: "absolute" as const,
+  top: 150,
+  left: "50%",
+  transform: "translateX(-50%)",
+  width: 112,
+  height: 112,
+  borderRadius: "50%",
+  border: "4px solid #0A0A0A",
+  overflow: "hidden",
+  background: "#1d1d1d",
+  boxShadow: "0 12px 30px rgba(0,0,0,0.28)",
+}
+
+const profileImg = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover" as const,
+}
+
+const settingsBtn = {
+  position: "absolute" as const,
+  top: 14,
+  right: 14,
+  background: "rgba(0,0,0,0.58)",
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: "50%",
+  padding: 10,
+  color: "#fff",
+  cursor: "pointer",
+  backdropFilter: "blur(10px)",
+}
+
+const nameRow = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  marginBottom: 4,
+}
+
+const rolePill = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "7px 12px",
+  borderRadius: 999,
+  background: "rgba(201,168,76,0.14)",
+  color: GOLD,
+  fontWeight: 800,
+  fontSize: 12,
+  marginBottom: 12,
+}
+
+const bioText = {
+  color: "#d1d1d1",
+  fontSize: 14,
+  lineHeight: 1.6,
+  maxWidth: 420,
+  margin: "0 auto",
+}
+
+const statsRow = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, 1fr)",
+  gap: 10,
+  padding: "0 16px",
+  marginBottom: 14,
+}
+
+const statBox = {
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 18,
+  padding: "14px 8px",
+  textAlign: "center" as const,
+  cursor: "pointer",
+}
+
+const statNumber = {
+  fontWeight: 900,
+  fontSize: 18,
+  marginBottom: 4,
+}
+
+const statLabel = {
+  color: "#aaa",
+  fontSize: 11,
+}
+
+const actionsRow = {
+  display: "flex",
+  justifyContent: "center",
+  gap: 10,
+  margin: "12px 16px 16px",
+  flexWrap: "wrap" as const,
+}
+
+const primaryActionBtn = {
+  padding: "12px 18px",
+  borderRadius: 14,
+  background: `linear-gradient(135deg, ${GOLD}, #8B6914)`,
+  border: "none",
+  color: "#000",
+  fontWeight: 900,
+  cursor: "pointer",
+  minWidth: 110,
+}
+
+const secondaryActionBtn = {
+  padding: "12px 18px",
+  borderRadius: 14,
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  color: "#fff",
+  fontWeight: 800,
+  cursor: "pointer",
+  minWidth: 110,
+}
+
+const iconActionBtn = {
+  width: 46,
+  height: 46,
+  borderRadius: "50%",
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  color: "#fff",
+  cursor: "pointer",
+}
+
+const sectionCard = {
+  background: CARD,
+  margin: "0 16px 16px",
+  padding: 16,
+  borderRadius: 20,
+  border: "1px solid rgba(255,255,255,0.08)",
+}
+
+const sectionTitle = {
+  fontWeight: 900,
+  marginBottom: 12,
+  fontSize: 15,
+}
+
+const activityGrid = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 10,
+}
+
+const activityBox = {
+  background: "rgba(255,255,255,0.03)",
+  borderRadius: 16,
+  padding: "14px 12px",
+}
+
+const activityNumber = {
+  color: GOLD,
+  fontWeight: 900,
+  fontSize: 18,
+  marginBottom: 4,
+}
+
+const activityLabel = {
+  color: "#b7b7b7",
+  fontSize: 12,
+  lineHeight: 1.4,
+}
+
+const bridgeText = {
+  color: "#d1d1d1",
+  fontSize: 14,
+  lineHeight: 1.6,
+  marginBottom: 12,
+}
+
+const bridgeMiniRow = {
+  display: "flex",
+  flexWrap: "wrap" as const,
+  gap: 8,
+}
+
+const bridgeMiniPill = {
+  padding: "7px 10px",
+  borderRadius: 999,
+  background: "rgba(201,168,76,0.10)",
+  color: GOLD,
+  border: "1px solid rgba(201,168,76,0.22)",
+  fontSize: 11,
+  fontWeight: 800,
+  textTransform: "uppercase" as const,
+  letterSpacing: 0.6,
+}
+
+const tabsRow = {
+  display: "flex",
+  justifyContent: "space-around",
+  borderBottom: "1px solid #222",
+  marginTop: 2,
+}
+
+const tabBtn = {
+  padding: 12,
+  background: "transparent",
+  border: "none",
+  color: "#aaa",
+  cursor: "pointer",
+  textTransform: "capitalize" as const,
+}
+
+const tabActive = {
+  ...tabBtn,
+  color: GOLD,
+  borderBottom: `2px solid ${GOLD}`,
+}
+
+const postsWrap = {
+  padding: 8,
+}
+
+const grid = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr 1fr",
+  gap: 6,
+}
+
+const gridItem = {
+  height: 118,
+  background: "#222",
+  borderRadius: 14,
+  overflow: "hidden",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+}
+
+const gridImage = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover" as const,
+  display: "block",
+}
+
+const gridFallbackText = {
+  color: "#cfcfcf",
+  fontSize: 12,
+  padding: 10,
+  textAlign: "center" as const,
+  lineHeight: 1.4,
+}
+
+const card = {
+  background: CARD,
+  padding: 16,
+  borderRadius: 16,
+  marginBottom: 10,
+  border: "1px solid rgba(255,255,255,0.08)",
+}
+
+const emptyWrap = {
+  marginTop: 18,
+  textAlign: "center" as const,
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 22,
+  padding: "28px 18px",
+}
+
+const emptyTitle = {
+  fontSize: 20,
+  fontWeight: 900,
+  marginBottom: 8,
+}
+
+const emptyText = {
+  color: "#aaa",
+  fontSize: 14,
+  lineHeight: 1.5,
+}
+
+const modalOverlay = {
+  position: "fixed" as const,
+  inset: 0,
+  background: "rgba(0,0,0,0.68)",
+  display: "flex",
+  alignItems: "flex-end",
+  justifyContent: "center",
+  zIndex: 100,
+}
+
+const socialsModal = {
+  width: "100%",
+  maxWidth: 520,
+  background: DARK,
+  borderTopLeftRadius: 26,
+  borderTopRightRadius: 26,
+  border: "1px solid rgba(255,255,255,0.08)",
+  padding: 18,
+  boxSizing: "border-box" as const,
+}
+
+const socialsModalHeader = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 14,
+}
+
+const socialsModalTitle = {
+  fontSize: 18,
+  fontWeight: 900,
+}
+
+const closeBtn = {
+  width: 36,
+  height: 36,
+  borderRadius: "50%",
+  border: "1px solid rgba(255,255,255,0.08)",
+  background: CARD,
+  color: "#fff",
+  cursor: "pointer",
+}
+
+const socialsGrid = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr 1fr",
+  gap: 12,
+}
+
+const socialIconBtn = {
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 18,
+  padding: "14px 10px",
+  display: "flex",
+  flexDirection: "column" as const,
+  alignItems: "center",
+  gap: 10,
+  color: "#fff",
+  cursor: "pointer",
+}
+
+const socialIconCircle = {
+  width: 48,
+  height: 48,
+  borderRadius: "50%",
+  background: "rgba(201,168,76,0.14)",
+  color: GOLD,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+}
+
+const socialIconLabel = {
+  fontSize: 12,
+  fontWeight: 800,
+}
+
+const emptyWrapSmall = {
+  textAlign: "center" as const,
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 20,
+  padding: "24px 16px",
+}
+
+const emptyTitleSmall = {
+  fontSize: 17,
+  fontWeight: 900,
+  marginBottom: 8,
+}
+
+const emptyTextSmall = {
+  color: "#aaa",
+  fontSize: 13,
+  lineHeight: 1.5,
+}

@@ -1,0 +1,889 @@
+"use client"
+
+import { useMemo, useState } from "react"
+import {
+  ChevronLeft,
+  Users,
+  Lock,
+  Globe,
+  Send,
+  Heart,
+  MessageCircle,
+  Sparkles,
+  Pin,
+} from "lucide-react"
+import { TopHeader } from "@/components/navigation/top-header"
+import { BottomNav } from "@/components/navigation/bottom-nav"
+import { useApp } from "@/lib/app-context"
+
+type SpacePostFilter = "all" | "recent" | "popular"
+
+const GOLD = "#C9A84C"
+const DARK = "#0A0A0A"
+const CARD = "#121212"
+
+function timeAgoFromDate(dateString: string) {
+  const now = Date.now()
+  const then = new Date(dateString).getTime()
+  const diff = Math.max(1, now - then)
+
+  const minutes = Math.floor(diff / (1000 * 60))
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+  if (minutes < 60) return `${minutes}m ago`
+  if (hours < 24) return `${hours}h ago`
+  return `${days}d ago`
+}
+
+function isFreshWithin7Days(dateString: string) {
+  const created = new Date(dateString).getTime()
+  const sevenDays = 7 * 24 * 60 * 60 * 1000
+  return Date.now() - created <= sevenDays
+}
+
+function getSpaceTypeLabel(key: string) {
+  return key === "private" ? "Private" : "Public"
+}
+
+function getSpaceThemeLabel(key: string) {
+  switch (key) {
+    case "dance":
+      return "Dance"
+    case "workshop":
+      return "Workshop"
+    case "free":
+      return "Free"
+    case "paid":
+      return "Paid"
+    case "public":
+      return "Public"
+    case "private":
+      return "Private"
+    case "off-campus":
+      return "Off Campus"
+    case "individual":
+      return "Individual"
+    case "general":
+      return "General"
+    case "music":
+      return "Music"
+    case "events":
+      return "Events"
+    case "opportunities":
+      return "Opportunities"
+    default:
+      return "Space"
+  }
+}
+
+export function SpaceScreen() {
+  const {
+    spaces,
+    activeSpace,
+    getSpacePosts,
+    creators,
+    user,
+    createCommunityPost,
+    toggleCommunityLike,
+    addCommunityComment,
+    toggleJoinSpace,
+    setCurrentScreen,
+  } = useApp()
+
+  const [postFilter, setPostFilter] = useState<SpacePostFilter>("all")
+  const [newMessage, setNewMessage] = useState("")
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
+
+  const currentSpace = useMemo(() => {
+    return spaces.find((space) => space.key === activeSpace) || null
+  }, [spaces, activeSpace])
+
+  const visiblePosts = useMemo(() => {
+    const source = getSpacePosts(activeSpace).filter((post) =>
+      isFreshWithin7Days(post.createdAt)
+    )
+
+    if (postFilter === "recent") {
+      return [...source].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
+    }
+
+    if (postFilter === "popular") {
+      return [...source].sort((a, b) => b.likes - a.likes)
+    }
+
+    return source
+  }, [activeSpace, getSpacePosts, postFilter])
+
+  const pinnedPost = useMemo(() => {
+    if (visiblePosts.length === 0) return null
+    return [...visiblePosts].sort((a, b) => b.likes - a.likes)[0]
+  }, [visiblePosts])
+
+  const handlePost = () => {
+    const trimmed = newMessage.trim()
+    if (!trimmed || !activeSpace) return
+
+    createCommunityPost({
+      content: trimmed,
+      type: "post",
+      spaceKey: activeSpace,
+    })
+
+    setNewMessage("")
+  }
+
+  const handleComment = (postId: string) => {
+    const text = (commentDrafts[postId] || "").trim()
+    if (!text) return
+
+    addCommunityComment(postId, text)
+    setCommentDrafts((prev) => ({ ...prev, [postId]: "" }))
+  }
+
+  if (!currentSpace || !activeSpace) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: DARK,
+          color: "#fff",
+          paddingBottom: 96,
+        }}
+      >
+        <TopHeader title="Space" showBack onBack={() => setCurrentScreen("spaces")} />
+
+        <div style={{ padding: 16 }}>
+          <div style={emptyWrap}>
+            <div style={emptyTitle}>No space selected</div>
+            <div style={emptyText}>Go back and open a space first.</div>
+
+            <button onClick={() => setCurrentScreen("spaces")} style={goldBtn}>
+              Back to Spaces
+            </button>
+          </div>
+        </div>
+
+        <BottomNav />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: DARK,
+        color: "#fff",
+        paddingBottom: 110,
+      }}
+    >
+      <TopHeader
+        title={currentSpace.label}
+        showBack
+        onBack={() => setCurrentScreen("spaces")}
+      />
+
+      <div style={{ padding: "16px" }}>
+        <div style={heroCard}>
+          <div style={heroGlow} />
+
+          <div style={heroTop}>
+            <button onClick={() => setCurrentScreen("spaces")} style={backCircleBtn}>
+              <ChevronLeft size={18} />
+            </button>
+
+            <div style={heroEmoji}>{currentSpace.emoji}</div>
+
+            <div style={{ flex: 1 }}>
+              <div style={heroTitleRow}>
+                <div style={heroTitle}>{currentSpace.label}</div>
+
+                <div style={spaceTypePill}>
+                  {currentSpace.key === "private" ? <Lock size={12} /> : <Globe size={12} />}
+                  <span>{getSpaceTypeLabel(currentSpace.key)}</span>
+                </div>
+              </div>
+
+              <div style={heroDesc}>{currentSpace.description}</div>
+            </div>
+          </div>
+
+          <div style={heroStatsRow}>
+            <div style={heroStat}>
+              <Users size={14} />
+              <span>{currentSpace.membersCount} members</span>
+            </div>
+
+            <div style={heroStat}>
+              <Sparkles size={14} />
+              <span>{currentSpace.topicsCount} topics</span>
+            </div>
+
+            <div style={heroStat}>
+              <Pin size={14} />
+              <span>7-day live flow</span>
+            </div>
+          </div>
+
+          <div style={heroActionsRow}>
+            <button
+              onClick={() => toggleJoinSpace(currentSpace.key)}
+              style={currentSpace.isJoined ? joinedBtn : joinBtn}
+            >
+              {currentSpace.isJoined ? "Joined" : "Join Space"}
+            </button>
+          </div>
+        </div>
+
+        <div style={composerCard}>
+          <div style={composerTitle}>Talk in this Space</div>
+
+          <div style={composerHint}>
+            Posts here stay focused on{" "}
+            <span style={{ color: GOLD }}>{getSpaceThemeLabel(currentSpace.key)}</span>. Later we
+            can add auto-expiration after 7 days without redesigning this screen.
+          </div>
+
+          <textarea
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value.slice(0, 220))}
+            placeholder={`Write something for ${currentSpace.label}...`}
+            style={composerTextarea}
+          />
+
+          <div style={composerBottom}>
+            <div style={charCount}>{newMessage.length}/220</div>
+
+            <button onClick={handlePost} style={goldBtn} disabled={!newMessage.trim()}>
+              <Send size={15} />
+              <span>Post</span>
+            </button>
+          </div>
+        </div>
+
+        <div style={filtersWrap}>
+          {[
+            { key: "all", label: "All" },
+            { key: "recent", label: "Recent" },
+            { key: "popular", label: "Popular" },
+          ].map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setPostFilter(item.key as SpacePostFilter)}
+              style={postFilter === item.key ? chipActive : chip}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        {pinnedPost && (
+          <div style={pinnedCard}>
+            <div style={pinnedTop}>
+              <div style={pinnedLabel}>
+                <Pin size={13} />
+                <span>Pinned vibe</span>
+              </div>
+
+              <div style={pinnedMeta}>{pinnedPost.likes} likes</div>
+            </div>
+
+            <div style={pinnedContent}>{pinnedPost.content}</div>
+          </div>
+        )}
+
+        <div style={sectionHeader}>
+          <span>Conversation</span>
+          <div style={sectionCount}>{visiblePosts.length} active posts</div>
+        </div>
+
+        {visiblePosts.length === 0 ? (
+          <div style={emptyWrap}>
+            <div style={emptyTitle}>This space is quiet right now</div>
+            <div style={emptyText}>Be the first one to start the conversation.</div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {visiblePosts.map((post) => {
+              const creator = creators.find((item) => item.id === post.authorId) || null
+
+              return (
+                <div key={post.id} style={postCard}>
+                  <div style={postHeader}>
+                    <div style={postAuthorRow}>
+                      <div style={postAvatarWrap}>
+                        <img
+                          src={creator?.avatar || user?.avatar || "/placeholder.svg"}
+                          alt={creator?.name || "Author"}
+                          style={postAvatar}
+                        />
+                      </div>
+
+                      <div>
+                        <div style={postAuthorName}>
+                          {creator?.displayName || creator?.name || user?.name || "Community"}
+                        </div>
+
+                        <div style={postMeta}>
+                          @{creator?.username || user?.username || "user"} •{" "}
+                          {timeAgoFromDate(post.createdAt)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={tagPill}>{getSpaceThemeLabel(currentSpace.key)}</div>
+                  </div>
+
+                  <div style={postContent}>{post.content}</div>
+
+                  {post.image && (
+                    <div style={postImageWrap}>
+                      <img src={post.image} alt="Post" style={postImage} />
+                    </div>
+                  )}
+
+                  <div style={actionsRow}>
+                    <button onClick={() => toggleCommunityLike(post.id)} style={actionBtn}>
+                      <Heart
+                        size={18}
+                        fill={post.isLiked ? "#ff4d67" : "transparent"}
+                        color={post.isLiked ? "#ff4d67" : "#c8c8c8"}
+                      />
+                      <span>{post.likes}</span>
+                    </button>
+
+                    <div style={actionBtnStatic}>
+                      <MessageCircle size={18} color="#c8c8c8" />
+                      <span>{post.comments.length}</span>
+                    </div>
+                  </div>
+
+                  <div style={commentsWrap}>
+                    {post.comments.length > 0 && (
+                      <div
+                        style={{
+                          marginBottom: 12,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 10,
+                        }}
+                      >
+                        {post.comments.slice(-3).map((comment) => (
+                          <div key={comment.id} style={commentCard}>
+                            <div style={commentHeader}>
+                              <span style={commentAuthor}>{comment.authorName}</span>
+                              <span style={commentTime}>
+                                {timeAgoFromDate(comment.createdAt)}
+                              </span>
+                            </div>
+
+                            <div style={commentText}>{comment.content}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={commentInputRow}>
+                      <input
+                        value={commentDrafts[post.id] || ""}
+                        onChange={(e) =>
+                          setCommentDrafts((prev) => ({
+                            ...prev,
+                            [post.id]: e.target.value.slice(0, 100),
+                          }))
+                        }
+                        placeholder="Add a comment..."
+                        style={commentInput}
+                      />
+
+                      <button
+                        onClick={() => handleComment(post.id)}
+                        style={commentSendBtn}
+                        disabled={!commentDrafts[post.id]?.trim()}
+                      >
+                        Post
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <BottomNav />
+    </div>
+  )
+}
+
+const heroCard = {
+  position: "relative" as const,
+  overflow: "hidden",
+  background:
+    "radial-gradient(circle at top right, rgba(201,168,76,0.16), transparent 28%), linear-gradient(135deg, #0c0c0c 0%, #141414 52%, #0a0a0a 100%)",
+  border: "1px solid rgba(201,168,76,0.16)",
+  borderRadius: 26,
+  padding: "16px",
+  marginBottom: 16,
+}
+
+const heroGlow = {
+  position: "absolute" as const,
+  top: -20,
+  right: -20,
+  width: 150,
+  height: 150,
+  borderRadius: "50%",
+  background: "radial-gradient(circle, rgba(201,168,76,0.14), transparent 70%)",
+  filter: "blur(8px)",
+}
+
+const heroTop = {
+  position: "relative" as const,
+  zIndex: 2,
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 12,
+  marginBottom: 14,
+}
+
+const backCircleBtn = {
+  width: 42,
+  height: 42,
+  borderRadius: "50%",
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "rgba(255,255,255,0.03)",
+  color: "#fff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  flexShrink: 0 as const,
+}
+
+const heroEmoji = {
+  width: 48,
+  height: 48,
+  borderRadius: 16,
+  background: "rgba(255,255,255,0.04)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: 24,
+  flexShrink: 0 as const,
+}
+
+const heroTitleRow = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  flexWrap: "wrap" as const,
+  marginBottom: 8,
+}
+
+const heroTitle = {
+  fontSize: 24,
+  fontWeight: 900,
+}
+
+const heroDesc = {
+  color: "#cfcfcf",
+  fontSize: 14,
+  lineHeight: 1.55,
+}
+
+const spaceTypePill = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+  padding: "6px 10px",
+  borderRadius: 999,
+  background: "rgba(255,255,255,0.04)",
+  color: "#d4d4d4",
+  fontSize: 11,
+  fontWeight: 800,
+}
+
+const heroStatsRow = {
+  position: "relative" as const,
+  zIndex: 2,
+  display: "flex",
+  flexWrap: "wrap" as const,
+  gap: 10,
+  marginBottom: 14,
+}
+
+const heroStat = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "9px 12px",
+  borderRadius: 999,
+  background: "rgba(255,255,255,0.04)",
+  color: "#d8d8d8",
+  fontSize: 12,
+  fontWeight: 700,
+}
+
+const heroActionsRow = {
+  position: "relative" as const,
+  zIndex: 2,
+}
+
+const composerCard = {
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 24,
+  padding: "16px",
+  marginBottom: 16,
+}
+
+const composerTitle = {
+  fontSize: 18,
+  fontWeight: 900,
+  marginBottom: 8,
+}
+
+const composerHint = {
+  color: "#b4b4b4",
+  fontSize: 13,
+  lineHeight: 1.5,
+  marginBottom: 12,
+}
+
+const composerTextarea = {
+  width: "100%",
+  minHeight: 100,
+  padding: "14px 16px",
+  borderRadius: 16,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "rgba(255,255,255,0.03)",
+  color: "#fff",
+  fontSize: 14,
+  outline: "none",
+  boxSizing: "border-box" as const,
+  resize: "vertical" as const,
+}
+
+const composerBottom = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginTop: 12,
+  gap: 12,
+}
+
+const charCount = {
+  color: "#8d8d8d",
+  fontSize: 12,
+}
+
+const filtersWrap = {
+  display: "flex",
+  gap: 10,
+  overflowX: "auto" as const,
+  paddingBottom: 8,
+  marginBottom: 16,
+  scrollbarWidth: "none" as const,
+}
+
+const chip = {
+  padding: "10px 14px",
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "transparent",
+  color: "#fff",
+  cursor: "pointer",
+  whiteSpace: "nowrap" as const,
+}
+
+const chipActive = {
+  ...chip,
+  border: "1px solid rgba(201,168,76,0.45)",
+  background: "rgba(201,168,76,0.12)",
+  color: GOLD,
+}
+
+const pinnedCard = {
+  background: "linear-gradient(135deg, rgba(201,168,76,0.10), rgba(255,255,255,0.02))",
+  border: "1px solid rgba(201,168,76,0.18)",
+  borderRadius: 22,
+  padding: "14px",
+  marginBottom: 16,
+}
+
+const pinnedTop = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 10,
+}
+
+const pinnedLabel = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  color: GOLD,
+  fontSize: 12,
+  fontWeight: 900,
+  textTransform: "uppercase" as const,
+  letterSpacing: 0.6,
+}
+
+const pinnedMeta = {
+  color: "#b7b7b7",
+  fontSize: 12,
+  fontWeight: 700,
+}
+
+const pinnedContent = {
+  color: "#fff",
+  fontSize: 15,
+  lineHeight: 1.55,
+}
+
+const sectionHeader = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 12,
+  fontSize: 21,
+  fontWeight: 900,
+}
+
+const sectionCount = {
+  color: "#909090",
+  fontSize: 12,
+  fontWeight: 700,
+}
+
+const postCard = {
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 24,
+  padding: "14px",
+}
+
+const postHeader = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: 10,
+  marginBottom: 12,
+}
+
+const postAuthorRow = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+}
+
+const postAvatarWrap = {
+  width: 44,
+  height: 44,
+  borderRadius: "50%",
+  overflow: "hidden",
+  background: "#222",
+  border: `2px solid ${GOLD}`,
+  flexShrink: 0 as const,
+}
+
+const postAvatar = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover" as const,
+  display: "block",
+}
+
+const postAuthorName = {
+  fontSize: 16,
+  fontWeight: 900,
+  marginBottom: 3,
+}
+
+const postMeta = {
+  color: "#9f9f9f",
+  fontSize: 12,
+}
+
+const tagPill = {
+  padding: "7px 10px",
+  borderRadius: 999,
+  background: "rgba(201,168,76,0.10)",
+  color: GOLD,
+  fontSize: 11,
+  fontWeight: 800,
+  whiteSpace: "nowrap" as const,
+}
+
+const postContent = {
+  color: "#fff",
+  fontSize: 16,
+  lineHeight: 1.55,
+  marginBottom: 12,
+}
+
+const postImageWrap = {
+  width: "100%",
+  borderRadius: 18,
+  overflow: "hidden",
+  background: "#1a1a1a",
+  marginBottom: 12,
+}
+
+const postImage = {
+  width: "100%",
+  height: 220,
+  objectFit: "cover" as const,
+  display: "block",
+}
+
+const actionsRow = {
+  display: "flex",
+  gap: 18,
+  alignItems: "center",
+  marginBottom: 12,
+}
+
+const actionBtn = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  background: "transparent",
+  border: "none",
+  color: "#d1d1d1",
+  cursor: "pointer",
+  padding: 0,
+  fontSize: 14,
+}
+
+const actionBtnStatic = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  color: "#d1d1d1",
+  fontSize: 14,
+}
+
+const commentsWrap = {
+  borderTop: "1px solid rgba(255,255,255,0.06)",
+  paddingTop: 12,
+}
+
+const commentCard = {
+  background: "rgba(255,255,255,0.03)",
+  border: "1px solid rgba(255,255,255,0.05)",
+  borderRadius: 16,
+  padding: "10px 12px",
+}
+
+const commentHeader = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 6,
+  gap: 10,
+}
+
+const commentAuthor = {
+  fontWeight: 800,
+  fontSize: 13,
+}
+
+const commentTime = {
+  color: "#8d8d8d",
+  fontSize: 11,
+}
+
+const commentText = {
+  color: "#d7d7d7",
+  fontSize: 13,
+  lineHeight: 1.45,
+}
+
+const commentInputRow = {
+  display: "flex",
+  gap: 10,
+  alignItems: "center",
+}
+
+const commentInput = {
+  flex: 1,
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "rgba(255,255,255,0.03)",
+  color: "#fff",
+  fontSize: 14,
+  outline: "none",
+}
+
+const commentSendBtn = {
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "none",
+  background: `linear-gradient(135deg, ${GOLD}, #8B6914)`,
+  color: "#000",
+  fontWeight: 900,
+  cursor: "pointer",
+}
+
+const joinBtn = {
+  width: "100%",
+  padding: "13px 16px",
+  borderRadius: 16,
+  border: "none",
+  background: `linear-gradient(135deg, ${GOLD}, #8B6914)`,
+  color: "#000",
+  fontWeight: 900,
+  cursor: "pointer",
+}
+
+const joinedBtn = {
+  width: "100%",
+  padding: "13px 16px",
+  borderRadius: 16,
+  border: `1px solid ${GOLD}`,
+  background: "transparent",
+  color: GOLD,
+  fontWeight: 900,
+  cursor: "pointer",
+}
+
+const goldBtn = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  padding: "13px 16px",
+  borderRadius: 16,
+  border: "none",
+  background: `linear-gradient(135deg, ${GOLD}, #8B6914)`,
+  color: "#000",
+  fontWeight: 900,
+  cursor: "pointer",
+}
+
+const emptyWrap = {
+  textAlign: "center" as const,
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 24,
+  padding: "34px 20px",
+}
+
+const emptyTitle = {
+  fontSize: 22,
+  fontWeight: 900,
+  marginBottom: 8,
+}
+
+const emptyText = {
+  color: "#aaa",
+  fontSize: 14,
+  lineHeight: 1.5,
+}

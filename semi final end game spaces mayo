@@ -1,0 +1,645 @@
+"use client"
+
+import { useMemo, useState } from "react"
+import { Search, Sparkles, Users, Lock, Globe, ChevronRight } from "lucide-react"
+import { TopHeader } from "@/components/navigation/top-header"
+import { BottomNav } from "@/components/navigation/bottom-nav"
+import { useApp, SpaceKey } from "@/lib/app-context"
+
+const GOLD = "#C9A84C"
+const DARK = "#0A0A0A"
+const CARD = "#121212"
+
+type SpaceFilter = "all" | "joined" | "popular" | "public" | "private"
+
+function getSpaceTypeLabel(key: SpaceKey) {
+  if (key === "private") return "Private"
+  return "Public"
+}
+
+function getSpaceVibe(key: SpaceKey) {
+  switch (key) {
+    case "dance":
+      return "Most active"
+    case "events":
+      return "Hot this week"
+    case "workshop":
+      return "Learn & grow"
+    case "music":
+      return "Playlist energy"
+    case "opportunities":
+      return "Real connections"
+    case "free":
+      return "Open access"
+    case "paid":
+      return "Premium plans"
+    default:
+      return "Community space"
+  }
+}
+
+export function SpacesScreen() {
+  const {
+  spaces,
+  openSpace,
+  toggleJoinSpace,
+  setCurrentScreen,
+} = useApp()
+
+  const [query, setQuery] = useState("")
+  const [activeFilter, setActiveFilter] = useState<SpaceFilter>("all")
+
+  const filteredSpaces = useMemo(() => {
+    let result = [...spaces]
+
+    if (query.trim()) {
+      const q = query.trim().toLowerCase()
+      result = result.filter(
+        (space) =>
+          space.label.toLowerCase().includes(q) ||
+          space.description.toLowerCase().includes(q)
+      )
+    }
+
+    if (activeFilter === "joined") {
+      result = result.filter((space) => space.isJoined)
+    }
+
+    if (activeFilter === "popular") {
+      result = [...result].sort((a, b) => b.membersCount - a.membersCount)
+    }
+
+    if (activeFilter === "public") {
+      result = result.filter((space) => space.key !== "private")
+    }
+
+    if (activeFilter === "private") {
+      result = result.filter((space) => space.key === "private")
+    }
+
+    return result
+  }, [spaces, query, activeFilter])
+
+  const joinedCount = spaces.filter((space) => space.isJoined).length
+  const popularSpaces = [...spaces]
+    .sort((a, b) => b.membersCount - a.membersCount)
+    .slice(0, 3)
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: DARK,
+        color: "#fff",
+        paddingBottom: 96,
+      }}
+    >
+      <TopHeader title="Spaces" showBack onBack={() => setCurrentScreen("community")} />
+
+      <div style={{ padding: "16px" }}>
+        <div style={heroCard}>
+          <div style={heroGlow} />
+          <div style={heroTopRow}>
+            <div style={heroIconWrap}>
+              <Users size={18} />
+            </div>
+            <div style={heroEyebrow}>COMMUNITY HUBS</div>
+          </div>
+
+          <div style={heroTitle}>Organized conversations, not random noise.</div>
+
+          <div style={heroText}>
+            Spaces help people talk by topic, vibe, and interest — so Community feels powerful,
+            simple, and premium.
+          </div>
+
+          <div style={heroStatsRow}>
+            <div style={heroStatBox}>
+              <div style={heroStatNumber}>{spaces.length}</div>
+              <div style={heroStatLabel}>Spaces</div>
+            </div>
+
+            <div style={heroStatBox}>
+              <div style={heroStatNumber}>{joinedCount}</div>
+              <div style={heroStatLabel}>Joined</div>
+            </div>
+
+            <div style={heroStatBox}>
+              <div style={heroStatNumber}>
+                {spaces.reduce((sum, space) => sum + space.membersCount, 0)}
+              </div>
+              <div style={heroStatLabel}>Members</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={searchWrap}>
+          <Search size={18} color="#9a9a9a" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search spaces"
+            style={searchInput}
+          />
+        </div>
+
+        <div style={filtersWrap}>
+          {[
+            { key: "all", label: "All" },
+            { key: "joined", label: "Joined" },
+            { key: "popular", label: "Popular" },
+            { key: "public", label: "Public" },
+            { key: "private", label: "Private" },
+          ].map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setActiveFilter(item.key as SpaceFilter)}
+              style={activeFilter === item.key ? chipActive : chip}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        {popularSpaces.length > 0 && activeFilter === "all" && !query.trim() && (
+          <div style={{ marginBottom: 22 }}>
+            <div style={sectionHeader}>
+              <span>Trending Spaces</span>
+              <div style={sectionHint}>
+                <Sparkles size={13} />
+                <span>Discover</span>
+              </div>
+            </div>
+
+            <div style={featuredScroll}>
+              {popularSpaces.map((space) => (
+                <button
+                  key={space.key}
+                  onClick={() => openSpace(space.key)}
+                  style={featuredCard}
+                >
+                  <div style={featuredEmoji}>{space.emoji}</div>
+                  <div style={featuredName}>{space.label}</div>
+                  <div style={featuredDesc}>{space.description}</div>
+
+                  <div style={featuredMetaRow}>
+                    <span style={featuredMetaText}>{space.membersCount} members</span>
+                    <span style={featuredMetaText}>{space.topicsCount} topics</span>
+                  </div>
+
+                  <div style={featuredBottomRow}>
+                    <span style={featuredPill}>{getSpaceVibe(space.key)}</span>
+                    <span style={featuredArrow}>
+                      Open <ChevronRight size={14} />
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={sectionHeader}>
+          <span>All Spaces</span>
+          <div style={sectionCount}>{filteredSpaces.length} shown</div>
+        </div>
+
+        {filteredSpaces.length === 0 ? (
+          <div style={emptyWrap}>
+            <div style={emptyTitle}>No spaces found</div>
+            <div style={emptyText}>
+              Try another search or switch the filter.
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {filteredSpaces.map((space) => (
+              <div key={space.key} style={spaceCard}>
+                <button
+                  onClick={() => openSpace(space.key)}
+                  style={spaceMainBtn}
+                >
+                  <div style={spaceEmojiWrap}>{space.emoji}</div>
+
+                  <div style={{ flex: 1, textAlign: "left" }}>
+                    <div style={spaceTitleRow}>
+                      <div style={spaceName}>{space.label}</div>
+                      <div style={spaceTypePill}>
+                        {space.key === "private" ? <Lock size={12} /> : <Globe size={12} />}
+                        <span>{getSpaceTypeLabel(space.key)}</span>
+                      </div>
+                    </div>
+
+                    <div style={spaceDesc}>{space.description}</div>
+
+                    <div style={spaceMetaRow}>
+                      <span style={spaceMeta}>{space.membersCount} members</span>
+                      <span style={spaceMeta}>{space.topicsCount} topics</span>
+                      <span style={spaceMeta}>{getSpaceVibe(space.key)}</span>
+                    </div>
+                  </div>
+                </button>
+
+                <div style={spaceActionsRow}>
+                  <button
+                    onClick={() => toggleJoinSpace(space.key)}
+                    style={space.isJoined ? joinedBtn : joinBtn}
+                  >
+                    {space.isJoined ? "Joined" : "Join"}
+                  </button>
+
+                  <button
+                    onClick={() => openSpace(space.key)}
+                    style={openBtn}
+                  >
+                    Open
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <BottomNav />
+    </div>
+  )
+}
+
+const heroCard = {
+  position: "relative" as const,
+  overflow: "hidden",
+  background:
+    "radial-gradient(circle at top left, rgba(201,168,76,0.20), transparent 30%), linear-gradient(135deg, #0d0d0d 0%, #131313 52%, #0a0a0a 100%)",
+  border: "1px solid rgba(201,168,76,0.16)",
+  borderRadius: 26,
+  padding: "18px",
+  marginBottom: 18,
+}
+
+const heroGlow = {
+  position: "absolute" as const,
+  top: -10,
+  right: -20,
+  width: 160,
+  height: 160,
+  borderRadius: "50%",
+  background: "radial-gradient(circle, rgba(201,168,76,0.16), transparent 68%)",
+  filter: "blur(8px)",
+}
+
+const heroTopRow = {
+  position: "relative" as const,
+  zIndex: 2,
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  marginBottom: 12,
+}
+
+const heroIconWrap = {
+  width: 40,
+  height: 40,
+  borderRadius: "50%",
+  background: "rgba(201,168,76,0.14)",
+  color: GOLD,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+}
+
+const heroEyebrow = {
+  color: GOLD,
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: 2,
+}
+
+const heroTitle = {
+  position: "relative" as const,
+  zIndex: 2,
+  fontSize: 28,
+  fontWeight: 900,
+  lineHeight: 1.05,
+  marginBottom: 10,
+  maxWidth: 320,
+}
+
+const heroText = {
+  position: "relative" as const,
+  zIndex: 2,
+  color: "#d4d4d4",
+  fontSize: 14,
+  lineHeight: 1.55,
+  marginBottom: 16,
+  maxWidth: 360,
+}
+
+const heroStatsRow = {
+  position: "relative" as const,
+  zIndex: 2,
+  display: "grid",
+  gridTemplateColumns: "repeat(3, 1fr)",
+  gap: 10,
+}
+
+const heroStatBox = {
+  background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.06)",
+  borderRadius: 18,
+  padding: "12px 10px",
+  textAlign: "center" as const,
+}
+
+const heroStatNumber = {
+  color: GOLD,
+  fontWeight: 900,
+  fontSize: 18,
+  marginBottom: 4,
+}
+
+const heroStatLabel = {
+  color: "#aaa",
+  fontSize: 11,
+}
+
+const searchWrap = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 18,
+  padding: "12px 14px",
+  marginBottom: 16,
+}
+
+const searchInput = {
+  flex: 1,
+  background: "transparent",
+  border: "none",
+  outline: "none",
+  color: "#fff",
+  fontSize: 14,
+}
+
+const filtersWrap = {
+  display: "flex",
+  gap: 10,
+  overflowX: "auto" as const,
+  paddingBottom: 8,
+  marginBottom: 18,
+  scrollbarWidth: "none" as const,
+}
+
+const chip = {
+  padding: "10px 14px",
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "transparent",
+  color: "#fff",
+  cursor: "pointer",
+  whiteSpace: "nowrap" as const,
+}
+
+const chipActive = {
+  ...chip,
+  border: "1px solid rgba(201,168,76,0.45)",
+  background: "rgba(201,168,76,0.12)",
+  color: GOLD,
+}
+
+const sectionHeader = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 12,
+  fontSize: 21,
+  fontWeight: 900,
+}
+
+const sectionHint = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  color: GOLD,
+  fontSize: 12,
+  fontWeight: 900,
+  textTransform: "uppercase" as const,
+  letterSpacing: 0.7,
+}
+
+const sectionCount = {
+  color: "#8f8f8f",
+  fontSize: 12,
+  fontWeight: 700,
+}
+
+const featuredScroll = {
+  display: "flex",
+  gap: 14,
+  overflowX: "auto" as const,
+  paddingBottom: 6,
+  marginBottom: 8,
+  scrollbarWidth: "none" as const,
+}
+
+const featuredCard = {
+  minWidth: 245,
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 24,
+  padding: "16px",
+  color: "#fff",
+  cursor: "pointer",
+  textAlign: "left" as const,
+}
+
+const featuredEmoji = {
+  fontSize: 28,
+  marginBottom: 12,
+}
+
+const featuredName = {
+  fontSize: 20,
+  fontWeight: 900,
+  marginBottom: 8,
+}
+
+const featuredDesc = {
+  color: "#b9b9b9",
+  fontSize: 13,
+  lineHeight: 1.5,
+  minHeight: 40,
+  marginBottom: 12,
+}
+
+const featuredMetaRow = {
+  display: "flex",
+  gap: 12,
+  flexWrap: "wrap" as const,
+  marginBottom: 12,
+}
+
+const featuredMetaText = {
+  color: "#8d8d8d",
+  fontSize: 12,
+}
+
+const featuredBottomRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+}
+
+const featuredPill = {
+  padding: "6px 10px",
+  borderRadius: 999,
+  background: "rgba(201,168,76,0.10)",
+  color: GOLD,
+  fontSize: 11,
+  fontWeight: 800,
+}
+
+const featuredArrow = {
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  color: "#ddd",
+  fontSize: 13,
+  fontWeight: 800,
+}
+
+const spaceCard = {
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 24,
+  padding: "14px",
+}
+
+const spaceMainBtn = {
+  width: "100%",
+  background: "transparent",
+  border: "none",
+  color: "#fff",
+  display: "flex",
+  gap: 12,
+  padding: 0,
+  cursor: "pointer",
+}
+
+const spaceEmojiWrap = {
+  width: 58,
+  height: 58,
+  borderRadius: 18,
+  background: "rgba(255,255,255,0.04)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: 26,
+  flexShrink: 0 as const,
+}
+
+const spaceTitleRow = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  marginBottom: 8,
+  flexWrap: "wrap" as const,
+}
+
+const spaceName = {
+  fontSize: 18,
+  fontWeight: 900,
+}
+
+const spaceTypePill = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+  padding: "6px 10px",
+  borderRadius: 999,
+  background: "rgba(255,255,255,0.04)",
+  color: "#cfcfcf",
+  fontSize: 11,
+  fontWeight: 800,
+}
+
+const spaceDesc = {
+  color: "#b8b8b8",
+  fontSize: 13,
+  lineHeight: 1.5,
+  marginBottom: 10,
+}
+
+const spaceMetaRow = {
+  display: "flex",
+  gap: 12,
+  flexWrap: "wrap" as const,
+}
+
+const spaceMeta = {
+  color: "#8f8f8f",
+  fontSize: 12,
+}
+
+const spaceActionsRow = {
+  display: "flex",
+  gap: 10,
+  marginTop: 14,
+}
+
+const joinBtn = {
+  flex: 1,
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "none",
+  background: `linear-gradient(135deg, ${GOLD}, #8B6914)`,
+  color: "#000",
+  fontWeight: 900,
+  cursor: "pointer",
+}
+
+const joinedBtn = {
+  flex: 1,
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: `1px solid ${GOLD}`,
+  background: "transparent",
+  color: GOLD,
+  fontWeight: 900,
+  cursor: "pointer",
+}
+
+const openBtn = {
+  flex: 1,
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "rgba(255,255,255,0.03)",
+  color: "#fff",
+  fontWeight: 800,
+  cursor: "pointer",
+}
+
+const emptyWrap = {
+  marginTop: 8,
+  textAlign: "center" as const,
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 24,
+  padding: "32px 20px",
+}
+
+const emptyTitle = {
+  fontSize: 22,
+  fontWeight: 900,
+  marginBottom: 8,
+}
+
+const emptyText = {
+  color: "#aaa",
+  fontSize: 14,
+  lineHeight: 1.5,
+}

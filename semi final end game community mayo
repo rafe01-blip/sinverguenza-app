@@ -1,0 +1,1925 @@
+"use client"
+
+import React, { useMemo, useRef, useState } from "react"
+import { useApp } from "@/lib/app-context"
+import type { SpaceKey, StoryReaction } from "@/lib/app-context"
+
+import { TopHeader } from "@/components/navigation/top-header"
+import { BottomNav } from "@/components/navigation/bottom-nav"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+
+import {
+  Heart,
+  MessageCircle,
+  Share2,
+  MoreHorizontal,
+  Image as ImageIcon,
+  Send,
+  X,
+  Instagram,
+  ChevronDown,
+  ChevronUp,
+  Users,
+  Play,
+  BarChart3,
+  UserPlus,
+  UserCheck,
+  ExternalLink,
+  BadgeCheck,
+  Sparkles,
+  MessagesSquare,
+  Flame,
+  Plus,
+  Compass,
+  Video,
+} from "lucide-react"
+
+import Image from "next/image"
+
+///////////////////////////////////////////////////////////////
+// TYPES
+///////////////////////////////////////////////////////////////
+
+type ComposerType = "post" | "story" | "poll" | "video"
+type StoryAudienceOption = "public" | "followers" | "both"
+
+const STORY_REACTIONS: StoryReaction[] = ["❤️", "🔥", "👏", "🕺🏾", "💃", "😎", "🤣"]
+
+///////////////////////////////////////////////////////////////
+// 🔥 IMAGE FALLBACK FIX (IMPORTANTE)
+///////////////////////////////////////////////////////////////
+
+const DEFAULT_AVATAR = "/images/avatar-placeholder.png"
+
+
+function getSafeImage(src?: string | null) {
+  if (!src || src.includes("placeholder") || src === "/placeholder.svg") {
+    return DEFAULT_AVATAR
+  }
+  return src
+}
+
+///////////////////////////////////////////////////////////////
+// HELPERS
+///////////////////////////////////////////////////////////////
+
+function timeAgoFromDate(dateString: string) {
+  const now = Date.now()
+  const then = new Date(dateString).getTime()
+  const diff = Math.max(1, now - then)
+
+  const minutes = Math.floor(diff / (1000 * 60))
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+  if (minutes < 60) return `${minutes}m`
+  if (hours < 24) return `${hours}h`
+  return `${days}d`
+}
+
+function getCreatorBadgeClass(role: string) {
+  switch (role) {
+    case "official":
+      return "bg-primary/20 text-primary"
+    case "instructor":
+      return "bg-emerald-500/20 text-emerald-400"
+    case "host":
+      return "bg-violet-500/20 text-violet-400"
+    default:
+      return "bg-muted text-muted-foreground"
+  }
+}
+
+function getCreatorBadgeText(role: string) {
+  switch (role) {
+    case "official":
+      return "Official"
+    case "instructor":
+      return "Instructor"
+    case "host":
+      return "Host"
+    default:
+      return "Member"
+  }
+}
+
+function getSpaceLabel(space: SpaceKey) {
+  switch (space) {
+    case "dance":
+      return "Dance"
+    case "workshop":
+      return "Workshop"
+    case "events":
+      return "Events"
+    case "fitness":
+      return "Fitness"
+    default:
+      return "General"
+  }
+}
+
+function getTopReaction(
+  quickReactions?: Partial<Record<StoryReaction, number>>
+): StoryReaction | null {
+  if (!quickReactions) return null
+
+  let topReaction: StoryReaction | null = null
+  let topCount = 0
+
+  STORY_REACTIONS.forEach((reaction) => {
+    const count = quickReactions[reaction] ?? 0
+    if (count > topCount) {
+      topCount = count
+      topReaction = reaction
+    }
+  })
+
+  return topReaction
+}
+
+function isVideoPost(post: { type?: string; mediaType?: string }) {
+  return post.type === "video" || post.mediaType === "video"
+}
+
+function getPostMediaPreview(post: {
+  image?: string
+  mediaType?: "image" | "video"
+  mediaUrl?: string
+  thumbnailUrl?: string
+}) {
+  return post.thumbnailUrl || post.image || post.mediaUrl || ""
+}
+///////////////////////////////////////////////////////////////
+// PREMIUM UI HELPERS
+///////////////////////////////////////////////////////////////
+
+function SafeImage({
+  src,
+  alt,
+  fill = true,
+  className = "object-cover",
+}: {
+  src?: string | null
+  alt: string
+  fill?: boolean
+  className?: string
+}) {
+  const safeSrc = getSafeImage(src)
+
+  if (fill) {
+    return <Image src={safeSrc} alt={alt} fill className={className} />
+  }
+
+  return (
+    <Image
+      src={safeSrc}
+      alt={alt}
+      width={48}
+      height={48}
+      className={className}
+    />
+  )
+}
+
+function Avatar({
+  src,
+  name,
+  size = 40,
+}: {
+  src?: string | null
+  name: string
+  size?: number
+}) {
+  return (
+    <div
+      className="relative shrink-0 overflow-hidden rounded-full border border-white/10 bg-[#151515]"
+      style={{ width: size, height: size }}
+    >
+      <SafeImage src={src} alt={name} />
+    </div>
+  )
+}
+
+function GoldPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+      {children}
+    </span>
+  )
+}
+
+function CommunityHero() {
+  return (
+    <div className="relative overflow-hidden rounded-[26px] border border-white/10 bg-[#111111] px-4 py-4 shadow-[0_18px_38px_rgba(0,0,0,0.28)]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,168,76,0.14),transparent_36%)]" />
+      <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/10 blur-3xl" />
+
+      <div className="relative z-10">
+        <GoldPill>
+          <Sparkles className="mr-1.5 h-3 w-3" />
+          Community
+        </GoldPill>
+
+        <h2 className="mt-3 text-[22px] font-semibold leading-tight tracking-[-0.03em] text-white">
+          Connect through real moments.
+        </h2>
+
+        <p className="mt-1 max-w-[280px] text-[13px] leading-5 text-zinc-400">
+          Stories, creators, spaces, and conversations from the Sin Vergüenza community.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function SectionHeader({
+  icon,
+  title,
+  action,
+}: {
+  icon: React.ReactNode
+  title: string
+  action?: React.ReactNode
+}) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <div className="text-primary">{icon}</div>
+        <h3 className="text-[14px] font-semibold text-white">{title}</h3>
+      </div>
+
+      {action}
+    </div>
+  )
+}
+///////////////////////////////////////////////////////////////
+// COMPACT STORY CARDS
+///////////////////////////////////////////////////////////////
+
+function StoryCard({ storyId }: { storyId: string }) {
+  const {
+    communityStories,
+    creators,
+    openStory,
+    toggleStoryLike,
+    setStoryReaction,
+  } = useApp()
+
+  const story = communityStories.find((item) => item.id === storyId)
+  if (!story) return null
+
+  const creator = creators.find((item) => item.id === story.authorId)
+  if (!creator) return null
+
+  const firstSlide = story.slides?.[0]
+
+  const coverImage =
+    firstSlide?.thumbnailUrl ||
+    firstSlide?.image ||
+    story.thumbnailUrl ||
+    story.image ||
+    creator.coverImage ||
+    creator.avatar
+
+  const storyIsVideo = story.type === "video" || firstSlide?.type === "video"
+  const topReaction = getTopReaction(story.quickReactions)
+  const totalReplies = story.replies?.length ?? 0
+
+  return (
+    <div className="w-[132px] shrink-0">
+      <button
+        onClick={() => openStory(story.id, "community")}
+        className="group block w-full text-left"
+      >
+        <div className="relative h-[172px] overflow-hidden rounded-[22px] border border-white/10 bg-[#111] shadow-[0_12px_28px_rgba(0,0,0,0.28)]">
+          <SafeImage
+            src={coverImage}
+            alt={story.content || creator.name}
+            className="object-cover transition-transform duration-300 group-active:scale-[1.02]"
+          />
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/20 to-black/15" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,168,76,0.14),transparent_30%)]" />
+
+          <div className="absolute left-2 top-2 flex items-center gap-1.5">
+            <Avatar
+              src={creator.avatar}
+              name={creator.displayName || creator.name}
+              size={28}
+            />
+
+            {creator.isVerified && (
+              <div className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-black">
+                <BadgeCheck className="h-3 w-3" />
+              </div>
+            )}
+          </div>
+
+          <div className="absolute right-2 top-2 rounded-full border border-white/10 bg-black/45 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/80 backdrop-blur-md">
+            {storyIsVideo ? "Video" : "24h"}
+          </div>
+
+          {storyIsVideo && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white backdrop-blur-md">
+                <Play className="ml-0.5 h-4 w-4 fill-white" />
+              </div>
+            </div>
+          )}
+
+          <div className="absolute inset-x-2 bottom-2">
+            <div className="rounded-[16px] border border-white/10 bg-black/45 px-2.5 py-2 backdrop-blur-md">
+              <p className="truncate text-[11px] font-semibold text-white">
+                {creator.displayName || creator.name}
+              </p>
+
+              <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-white/75">
+                {story.content}
+              </p>
+
+              <div className="mt-1.5 flex items-center justify-between gap-2 text-[9px] text-white/55">
+                <span>{timeAgoFromDate(story.createdAt)}</span>
+                <span>{story.likesCount ?? 0} likes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </button>
+
+      <div className="mt-2 flex items-center justify-between gap-1">
+        <button
+          onClick={() => toggleStoryLike(story.id)}
+          className={`flex h-7 items-center gap-1 rounded-full border px-2 text-[10px] font-medium ${
+            story.isLiked
+              ? "border-red-500/30 bg-red-500/12 text-red-400"
+              : "border-white/10 bg-white/[0.04] text-zinc-300"
+          }`}
+        >
+          <Heart className={`h-3 w-3 ${story.isLiked ? "fill-red-500" : ""}`} />
+          {story.likesCount ?? 0}
+        </button>
+
+        <div className="flex items-center gap-1">
+          {STORY_REACTIONS.slice(0, 2).map((reaction) => (
+            <button
+              key={reaction}
+              onClick={() => setStoryReaction(story.id, reaction)}
+              className={`flex h-7 w-7 items-center justify-center rounded-full border text-[12px] ${
+                story.myReaction === reaction
+                  ? "border-primary bg-primary/15"
+                  : "border-white/10 bg-white/[0.04]"
+              }`}
+            >
+              {reaction}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-1 flex items-center justify-between gap-2 text-[9px] text-zinc-500">
+        <span className="truncate">
+          {topReaction ? `Top ${topReaction}` : story.seenByMe ? "Seen" : "New"}
+        </span>
+
+        <span>{totalReplies} replies</span>
+      </div>
+    </div>
+  )
+}
+
+function StoriesStrip({
+  storyIds,
+}: {
+  storyIds: string[]
+}) {
+  if (storyIds.length === 0) return null
+
+  return (
+    <div>
+      <SectionHeader
+        icon={<Play className="h-4 w-4" />}
+        title="Global Stories"
+        action={
+          <span className="text-[11px] font-medium text-zinc-500">
+            24h
+          </span>
+        }
+      />
+
+      <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {storyIds.map((storyId) => (
+          <StoryCard key={storyId} storyId={storyId} />
+        ))}
+      </div>
+    </div>
+  )
+}
+///////////////////////////////////////////////////////////////
+// STORIES STRIP (REFINADO)
+///////////////////////////////////////////////////////////////
+
+function StoriesSection({
+  storyIds,
+}: {
+  storyIds: string[]
+}) {
+  if (storyIds.length === 0) return null
+
+  return (
+    <div className="px-4 pt-4">
+      <SectionHeader
+        icon={<Play className="h-4 w-4" />}
+        title="Stories"
+        action={
+          <span className="text-[11px] font-medium text-zinc-500">
+            24h
+          </span>
+        }
+      />
+
+      <div className="flex gap-3 overflow-x-auto pb-2 pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {storyIds.map((storyId) => (
+          <StoryCard key={storyId} storyId={storyId} />
+        ))}
+
+        {/* 👉 END SPACING (importante para scroll suave) */}
+        <div className="w-1 shrink-0" />
+      </div>
+    </div>
+  )
+}
+///////////////////////////////////////////////////////////////
+// TOP CREATORS STRIP
+///////////////////////////////////////////////////////////////
+
+function TopCreatorsStrip({
+  creators,
+  openCreatorProfile,
+  toggleFollow,
+  showCreators,
+  setShowCreators,
+}: {
+  creators: ReturnType<typeof useApp>["creators"]
+  openCreatorProfile: (creatorId: string) => void
+  toggleFollow: (creatorId: string) => void
+  showCreators: boolean
+  setShowCreators: React.Dispatch<React.SetStateAction<boolean>>
+}) {
+  const visibleCreators = creators.slice(0, 4)
+
+  return (
+    <div className="px-4 pt-4">
+      <button
+        onClick={() => setShowCreators((prev) => !prev)}
+        className="mb-3 flex w-full items-center justify-between"
+      >
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-primary" />
+          <h3 className="text-[14px] font-semibold text-white">Top Creators</h3>
+        </div>
+
+        <div className="flex items-center gap-1 text-[11px] font-medium text-zinc-500">
+          <span>{showCreators ? "closed" : "open"}</span>
+          {showCreators ? (
+            <ChevronUp className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5" />
+          )}
+        </div>
+      </button>
+
+      {showCreators && (
+        <div className="flex gap-3 overflow-x-auto pb-1 pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {visibleCreators.map((creator) => {
+            const role = String(creator.role || "member")
+
+            return (
+              <div
+                key={creator.id}
+                className="min-w-[124px] shrink-0 rounded-[22px] border border-white/10 bg-[#111111] p-3 shadow-[0_12px_26px_rgba(0,0,0,0.24)]"
+              >
+                <button
+                  onClick={() => openCreatorProfile(creator.id)}
+                  className="block w-full text-center"
+                >
+                  <div className="relative mx-auto h-[58px] w-[58px] overflow-hidden rounded-full border border-primary/25 bg-[#161616] p-[2px]">
+                    <div className="relative h-full w-full overflow-hidden rounded-full">
+                      <SafeImage
+                        src={creator.avatar}
+                        alt={creator.displayName || creator.name}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-2 min-w-0">
+                    <div className="flex items-center justify-center gap-1">
+                      <p className="max-w-[84px] truncate text-[13px] font-semibold text-white">
+                        {creator.displayName || creator.name}
+                      </p>
+
+                      {creator.isVerified && (
+                        <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      )}
+                    </div>
+
+                    <p className="mt-0.5 max-w-[98px] truncate text-[10px] text-zinc-500">
+                      @{creator.username}
+                    </p>
+
+                    <span
+                      className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold ${getCreatorBadgeClass(
+                        role
+                      )}`}
+                    >
+                      {getCreatorBadgeText(role)}
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => toggleFollow(creator.id)}
+                  className={`mt-3 flex h-8 w-full items-center justify-center rounded-full border text-[11px] font-semibold transition-transform active:scale-[0.97] ${
+                    creator.isFollowing
+                      ? "border-white/10 bg-white/[0.04] text-white"
+                      : "border-primary bg-primary text-black"
+                  }`}
+                >
+                  {creator.isFollowing ? (
+                    <span className="inline-flex items-center gap-1">
+                      <UserCheck className="h-3.5 w-3.5" />
+                      Following
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1">
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Follow
+                    </span>
+                  )}
+                </button>
+              </div>
+            )
+          })}
+
+          <button
+            type="button"
+            className="flex min-w-[76px] shrink-0 flex-col items-center justify-center rounded-[22px] border border-dashed border-primary/35 bg-primary/5 px-3 text-primary"
+          >
+            <Plus className="h-5 w-5" />
+            <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em]">
+              More
+            </span>
+          </button>
+
+          <div className="w-1 shrink-0" />
+        </div>
+      )}
+    </div>
+  )
+}
+///////////////////////////////////////////////////////////////
+// SPACES PREVIEW
+///////////////////////////////////////////////////////////////
+
+function SpacesPreview({
+  spaces,
+  openSpace,
+  openExplore,
+  showSpaces,
+  setShowSpaces,
+}: {
+  spaces: ReturnType<typeof useApp>["spaces"]
+  openSpace: (space: SpaceKey) => void
+  openExplore: () => void
+  showSpaces: boolean
+  setShowSpaces: React.Dispatch<React.SetStateAction<boolean>>
+}) {
+  const previewSpaces = spaces.slice(0, 3)
+
+  return (
+    <div className="px-4 pt-4">
+      <div className="mb-3 flex items-center justify-between">
+  <button
+    onClick={() => setShowSpaces((prev) => !prev)}
+    className="flex items-center gap-2"
+  >
+    <MessagesSquare className="h-4 w-4 text-primary" />
+    <h3 className="text-[14px] font-semibold text-white">Spaces</h3>
+
+    {showSpaces ? (
+      <ChevronUp className="h-4 w-4 text-zinc-500" />
+    ) : (
+      <ChevronDown className="h-4 w-4 text-zinc-500" />
+    )}
+  </button>
+
+  <button
+    onClick={openExplore}
+    className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary"
+  >
+    Explore
+    <Compass className="h-3.5 w-3.5" />
+  </button>
+</div>
+{showSpaces && (
+  <div className="grid grid-cols-3 gap-2.5">
+    {previewSpaces.map((space) => (
+      <button
+        key={space.key}
+        onClick={() => openSpace(space.key)}
+        className="relative overflow-hidden rounded-[20px] border border-white/10 bg-[#111111] px-2.5 py-3 text-left shadow-[0_10px_24px_rgba(0,0,0,0.20)] transition-transform active:scale-[0.98]"
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,168,76,0.10),transparent_36%)]" />
+
+        <div className="relative z-10">
+          <div className="mb-2 flex items-center justify-between gap-1">
+            <span className="text-[22px]">{space.emoji}</span>
+
+            {space.isJoined && (
+              <span className="rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-primary">
+                In
+              </span>
+            )}
+
+            {!space.isJoined && space.visibility === "private" && (
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-zinc-400">
+                Private
+              </span>
+            )}
+          </div>
+
+          <p className="truncate text-[12px] font-semibold text-white">
+            {space.label}
+          </p>
+
+          <p className="mt-1 truncate text-[10px] text-zinc-500">
+            {space.membersCount} members
+          </p>
+
+          <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+            <div
+              className="h-full rounded-full bg-primary/70"
+              style={{
+                width: `${Math.min(100, Math.max(18, space.topicsCount * 3))}%`,
+              }}
+            />
+          </div>
+        </div>
+      </button>
+    ))}
+  </div>
+)}
+    </div>
+  )
+}
+///////////////////////////////////////////////////////////////
+// TRENDING PREVIEW
+///////////////////////////////////////////////////////////////
+
+function TrendingPreview({
+  trendingPosts,
+  creators,
+  openCreatorProfile,
+  expanded,
+  setExpanded,
+}: {
+  trendingPosts: ReturnType<typeof useApp>["communityPosts"]
+  creators: ReturnType<typeof useApp>["creators"]
+  openCreatorProfile: (creatorId: string) => void
+  expanded: boolean
+  setExpanded: React.Dispatch<React.SetStateAction<boolean>>
+}) {
+  if (trendingPosts.length === 0) return null
+
+  const visiblePosts = expanded ? trendingPosts : trendingPosts.slice(0, 1)
+
+  return (
+    <div className="px-4 pt-5">
+      <button
+        onClick={() => setExpanded((prev) => !prev)}
+        className="mb-3 flex w-full items-center justify-between"
+      >
+        <div className="flex items-center gap-2">
+          <Flame className="h-4 w-4 text-primary" />
+          <h3 className="text-[14px] font-semibold text-white">Trending Now</h3>
+        </div>
+
+        <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-zinc-400">
+          {expanded ? "closed" : "open"}
+          {expanded ? (
+            <ChevronUp className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5" />
+          )}
+        </span>
+      </button>
+
+      <div className="grid gap-3">
+        {visiblePosts.map((post) => {
+          const creator = creators.find((item) => item.id === post.authorId)
+          if (!creator) return null
+
+          const mediaPreview = getPostMediaPreview(post)
+          const videoPost = isVideoPost(post)
+
+          return (
+            <button
+              key={post.id}
+              onClick={() => openCreatorProfile(creator.id)}
+              className="group overflow-hidden rounded-[24px] border border-white/10 bg-[#111111] text-left shadow-[0_14px_30px_rgba(0,0,0,0.24)] transition-transform active:scale-[0.99]"
+            >
+              {mediaPreview && (
+                <div className="relative h-[120px] overflow-hidden bg-[#151515]">
+                  <SafeImage
+                    src={mediaPreview}
+                    alt={post.content}
+                    className="object-cover transition-transform duration-300 group-active:scale-[1.02]"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+                  {videoPost && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white backdrop-blur-md">
+                        <Play className="ml-0.5 h-4 w-4 fill-white" />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="absolute bottom-2 left-2">
+                    <GoldPill>
+                      <Flame className="mr-1 h-3 w-3" />
+                      Hot
+                    </GoldPill>
+                  </div>
+                </div>
+              )}
+
+              <div className="p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <Avatar
+                    src={creator.avatar}
+                    name={creator.displayName || creator.name}
+                    size={32}
+                  />
+
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1">
+                      <p className="truncate text-[13px] font-semibold text-white">
+                        {creator.displayName || creator.name}
+                      </p>
+
+                      {creator.isVerified && (
+                        <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      )}
+                    </div>
+
+                    <p className="text-[10px] text-zinc-500">
+                      {timeAgoFromDate(post.createdAt)}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="line-clamp-2 text-[13px] leading-5 text-zinc-200">
+                  {post.content}
+                </p>
+
+                <div className="mt-3 flex items-center gap-3 text-[11px] text-zinc-500">
+                  <span>{post.likes} likes</span>
+                  <span>{post.comments.length} comments</span>
+                  {post.spaceKey && <span>{getSpaceLabel(post.spaceKey)}</span>}
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+///////////////////////////////////////////////////////////////
+// MEDIA PREVIEW
+///////////////////////////////////////////////////////////////
+
+function MediaPreview({
+  image,
+  isVideo,
+}: {
+  image: string
+  isVideo: boolean
+}) {
+  if (
+  !image ||
+  image.includes("placeholder") ||
+  image === "/placeholder.svg" ||
+  image.includes("avatar-placeholder") ||
+  image.includes("cover-placeholder")
+) {
+  return null
+}
+
+  return (
+    <div className="relative mb-3 aspect-video overflow-hidden rounded-[22px] border border-white/10 bg-[#111111]">
+      <SafeImage
+        src={image}
+        alt="Post media"
+        className="object-cover"
+      />
+
+      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+
+      {isVideo && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white backdrop-blur-md">
+            <Play className="ml-0.5 h-5 w-5 fill-white" />
+          </div>
+        </div>
+      )}
+
+      {isVideo && (
+        <div className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/60 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-md">
+          <Video className="h-3 w-3" />
+          Video
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SpaceTag({
+  space,
+  onClick,
+}: {
+  space: SpaceKey
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary"
+    >
+      {getSpaceLabel(space)}
+    </button>
+  )
+}
+
+function MiniTag({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] text-zinc-400">
+      {children}
+    </span>
+  )
+}
+///////////////////////////////////////////////////////////////
+// POST CARD — HEADER + CONTENT
+///////////////////////////////////////////////////////////////
+
+function PostCard({
+  post,
+  creator,
+  user,
+  openCreatorProfile,
+  openSpace,
+  voteOnPoll,
+  toggleCommunityLike,
+  expandedComments,
+  toggleComments,
+  handleShare,
+  commentText,
+  setCommentText,
+  replyText,
+  setReplyText,
+  replyingTo,
+  setReplyingTo,
+  addCommunityComment,
+  addCommunityReply,
+}: {
+  post: ReturnType<typeof useApp>["communityPosts"][number]
+  creator: ReturnType<typeof useApp>["creators"][number]
+  user: ReturnType<typeof useApp>["user"]
+  openCreatorProfile: (creatorId: string) => void
+  openSpace: (space: SpaceKey) => void
+  voteOnPoll: (postId: string, optionId: string) => void
+  toggleCommunityLike: (postId: string) => void
+  expandedComments: string[]
+  toggleComments: (postId: string) => void
+  handleShare: (text: string, instagramLink?: string) => void
+  commentText: Record<string, string>
+  setCommentText: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  replyText: Record<string, string>
+  setReplyText: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  replyingTo: { postId: string; commentId: string } | null
+  setReplyingTo: React.Dispatch<
+    React.SetStateAction<{ postId: string; commentId: string } | null>
+  >
+  addCommunityComment: (postId: string, text: string) => void
+  addCommunityReply: (postId: string, commentId: string, text: string) => void
+}) {
+  const mediaPreview = getPostMediaPreview(post)
+  const videoPost = isVideoPost(post)
+  const role = String(creator.role || "member")
+
+  return (
+    <article className="px-4 py-4">
+      <div className="overflow-hidden rounded-[26px] border border-white/10 bg-[#111111] shadow-[0_14px_34px_rgba(0,0,0,0.24)]">
+        <div className="p-4">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <button
+              onClick={() => openCreatorProfile(creator.id)}
+              className="flex min-w-0 items-center gap-3 text-left"
+            >
+              <Avatar
+                src={creator.avatar}
+                name={creator.displayName || creator.name}
+                size={42}
+              />
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="max-w-[150px] truncate text-[14px] font-semibold text-white">
+                    {creator.displayName || creator.name}
+                  </span>
+
+                  {creator.isVerified && (
+                    <BadgeCheck className="h-4 w-4 shrink-0 text-primary" />
+                  )}
+
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${getCreatorBadgeClass(
+                      role
+                    )}`}
+                  >
+                    {getCreatorBadgeText(role)}
+                  </span>
+                </div>
+
+                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
+                  <span>{timeAgoFromDate(post.createdAt)}</span>
+                  <span>·</span>
+                  <span>@{creator.username}</span>
+
+                  {creator.instagramUrl && (
+                    <>
+                      <span>·</span>
+                      <span className="inline-flex items-center gap-1">
+                        <Instagram className="h-3 w-3" />
+                        IG
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </button>
+
+            <button className="rounded-full border border-white/10 bg-white/[0.04] p-1.5 text-zinc-500 transition-colors hover:text-white">
+              <MoreHorizontal className="h-4.5 w-4.5" />
+            </button>
+          </div>
+
+          {(post.spaceKey || post.isEventThread || (post.tags && post.tags.length > 0)) && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {post.spaceKey && (
+                <SpaceTag
+                  space={post.spaceKey as SpaceKey}
+                  onClick={() => openSpace(post.spaceKey as SpaceKey)}
+                />
+              )}
+
+              {post.isEventThread && <MiniTag>Event Chat</MiniTag>}
+
+              {post.tags?.slice(0, 2).map((tag) => (
+                <MiniTag key={`${post.id}-${tag}`}>{tag}</MiniTag>
+              ))}
+            </div>
+          )}
+
+          <p className="mb-3 text-[14px] leading-7 text-zinc-200">
+            {post.content}
+          </p>
+
+          {post.type === "poll" && post.pollOptions && (
+            <div className="mb-3 space-y-2">
+              {post.pollOptions.map((option) => {
+                const selected = post.selectedPollOptionId === option.id
+
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => voteOnPoll(post.id, option.id)}
+                    disabled={!!post.selectedPollOptionId}
+                    className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 transition-colors ${
+                      selected
+                        ? "border-primary bg-primary/10"
+                        : "border-white/10 bg-white/[0.04] hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-2 text-[13px] text-white">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      {option.text}
+                    </span>
+
+                    <span className="text-[11px] text-zinc-500">
+                      {option.votes} votes
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {mediaPreview && (
+            <MediaPreview image={mediaPreview} isVideo={videoPost} />
+          )}
+
+          {post.instagramUrl && (
+            <a
+              href={post.instagramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-3 inline-flex items-center gap-2 text-[13px] font-medium text-primary hover:underline"
+            >
+              <Instagram className="h-4 w-4" />
+              Open on Instagram
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          )}
+          <div className="flex items-center gap-5 border-t border-white/10 pt-3">
+            <button
+              onClick={() => toggleCommunityLike(post.id)}
+              className="flex items-center gap-2 text-zinc-500 transition-colors hover:text-red-400"
+            >
+              <Heart
+                className={`h-5 w-5 ${
+                  post.isLiked ? "fill-red-500 text-red-500" : ""
+                }`}
+              />
+              <span className="text-[13px]">{post.likes}</span>
+            </button>
+
+            <button
+              onClick={() => toggleComments(post.id)}
+              className="flex items-center gap-2 text-zinc-500 transition-colors hover:text-primary"
+            >
+              <MessageCircle className="h-5 w-5" />
+              <span className="text-[13px]">{post.comments.length}</span>
+
+              {post.comments.length > 0 &&
+                (expandedComments.includes(post.id) ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                ))}
+            </button>
+
+            <button
+              onClick={() =>
+                handleShare(
+                  `${post.content} ${post.instagramUrl || ""}`,
+                  post.instagramUrl
+                )
+              }
+              className="flex items-center gap-2 text-zinc-500 transition-colors hover:text-primary"
+            >
+              <Share2 className="h-5 w-5" />
+            </button>
+          </div>
+
+          {expandedComments.includes(post.id) && (
+            <CommentsBlock
+              post={post}
+              user={user}
+              commentText={commentText}
+              setCommentText={setCommentText}
+              replyText={replyText}
+              setReplyText={setReplyText}
+              replyingTo={replyingTo}
+              setReplyingTo={setReplyingTo}
+              addCommunityComment={addCommunityComment}
+              addCommunityReply={addCommunityReply}
+            />
+          )}
+        </div>
+      </div>
+    </article>
+  )
+}
+///////////////////////////////////////////////////////////////
+// COMMENTS BLOCK
+///////////////////////////////////////////////////////////////
+
+function CommentsBlock({
+  post,
+  user,
+  commentText,
+  setCommentText,
+  replyText,
+  setReplyText,
+  replyingTo,
+  setReplyingTo,
+  addCommunityComment,
+  addCommunityReply,
+}: {
+  post: ReturnType<typeof useApp>["communityPosts"][number]
+  user: ReturnType<typeof useApp>["user"]
+  commentText: Record<string, string>
+  setCommentText: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  replyText: Record<string, string>
+  setReplyText: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  replyingTo: { postId: string; commentId: string } | null
+  setReplyingTo: React.Dispatch<
+    React.SetStateAction<{ postId: string; commentId: string } | null>
+  >
+  addCommunityComment: (postId: string, text: string) => void
+  addCommunityReply: (postId: string, commentId: string, text: string) => void
+}) {
+  const submitComment = () => {
+    const text = commentText[post.id] || ""
+    if (!text.trim()) return
+
+    addCommunityComment(post.id, text)
+
+    setCommentText((prev) => ({
+      ...prev,
+      [post.id]: "",
+    }))
+  }
+
+  const submitReply = (commentId: string) => {
+    const text = replyText[commentId] || ""
+    if (!text.trim()) return
+
+    addCommunityReply(post.id, commentId, text)
+
+    setReplyText((prev) => ({
+      ...prev,
+      [commentId]: "",
+    }))
+
+    setReplyingTo(null)
+  }
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+      <div className="flex items-center gap-2">
+        <Avatar
+          src={user?.avatar}
+          name={user?.name || "User"}
+          size={32}
+        />
+
+        <Input
+          value={commentText[post.id] || ""}
+          onChange={(e) =>
+            setCommentText((prev) => ({
+              ...prev,
+              [post.id]: e.target.value.slice(0, 120),
+            }))
+          }
+          placeholder="Write a comment..."
+          className="h-9 flex-1 rounded-full border-white/10 bg-white/[0.04] text-sm"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault()
+              submitComment()
+            }
+          }}
+        />
+
+        <button
+          onClick={submitComment}
+          disabled={!commentText[post.id]?.trim()}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/25 bg-primary/10 text-primary disabled:opacity-40"
+        >
+          <Send className="h-4 w-4" />
+        </button>
+      </div>
+
+      {post.comments.length === 0 ? (
+        <p className="py-2 text-center text-[13px] text-zinc-500">
+          No comments yet. Be the first to comment.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {post.comments.slice(-10).map((comment) => (
+            <div key={comment.id} className="space-y-2">
+              <div className="flex items-start gap-2">
+                <Avatar
+                  src={comment.authorAvatar}
+                  name={comment.authorName}
+                  size={30}
+                />
+
+                <div className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[13px] font-semibold text-white">
+                      {comment.authorName}
+                    </span>
+
+                    <span className="text-[10px] text-zinc-500">
+                      {timeAgoFromDate(comment.createdAt)}
+                    </span>
+                  </div>
+
+                  <p className="mt-1 text-[13px] leading-5 text-zinc-300">
+                    {comment.content}
+                  </p>
+
+                  <button
+                    onClick={() =>
+                      setReplyingTo({
+                        postId: post.id,
+                        commentId: comment.id,
+                      })
+                    }
+                    className="mt-2 text-[11px] font-medium text-zinc-500 hover:text-primary"
+                  >
+                    Reply
+                  </button>
+                </div>
+              </div>
+
+              {replyingTo?.postId === post.id &&
+                replyingTo?.commentId === comment.id && (
+                  <div className="ml-10 flex items-center gap-2">
+                    <Input
+                      value={replyText[comment.id] || ""}
+                      placeholder={`Reply to ${comment.authorName}...`}
+                      className="h-8 flex-1 rounded-full border-white/10 bg-white/[0.04] text-sm"
+                      autoFocus
+                      onChange={(e) =>
+                        setReplyText((prev) => ({
+                          ...prev,
+                          [comment.id]: e.target.value.slice(0, 90),
+                        }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          submitReply(comment.id)
+                        }
+
+                        if (e.key === "Escape") {
+                          setReplyingTo(null)
+                        }
+                      }}
+                    />
+
+                    <button
+                      onClick={() => submitReply(comment.id)}
+                      disabled={!replyText[comment.id]?.trim()}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/25 bg-primary/10 text-primary disabled:opacity-40"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+
+              {comment.replies.length > 0 && (
+                <div className="ml-10 space-y-2">
+                  {comment.replies.map((reply) => (
+                    <div key={reply.id} className="flex items-start gap-2">
+                      <Avatar
+                        src={reply.authorAvatar}
+                        name={reply.authorName}
+                        size={24}
+                      />
+
+                      <div className="flex-1 rounded-[16px] border border-white/8 bg-white/[0.03] px-3 py-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[12px] font-semibold text-white">
+                            {reply.authorName}
+                          </span>
+
+                          <span className="text-[9px] text-zinc-500">
+                            {timeAgoFromDate(reply.createdAt)}
+                          </span>
+                        </div>
+
+                        <p className="mt-1 text-[12px] leading-5 text-zinc-300">
+                          {reply.content}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {post.comments.length >= 10 && (
+        <p className="text-center text-[11px] text-zinc-500">
+          Showing last 10 comments
+        </p>
+      )}
+    </div>
+  )
+}
+///////////////////////////////////////////////////////////////
+// COMPOSER SHEET — PART 1
+///////////////////////////////////////////////////////////////
+
+function ComposerSheet({
+  user,
+  spaces,
+  showComposer,
+  setShowComposer,
+  composerType,
+  setComposerType,
+  storyAudience,
+  setStoryAudience,
+  newPostContent,
+  setNewPostContent,
+  newPostImage,
+  setNewPostImage,
+  instagramUrl,
+  setInstagramUrl,
+  selectedSpaceForPost,
+  setSelectedSpaceForPost,
+  pollOption1,
+  setPollOption1,
+  pollOption2,
+  setPollOption2,
+  fileInputRef,
+  handleImageSelect,
+  handleCreatePost,
+  resetComposer,
+}: {
+  user: ReturnType<typeof useApp>["user"]
+  spaces: ReturnType<typeof useApp>["spaces"]
+  showComposer: boolean
+  setShowComposer: React.Dispatch<React.SetStateAction<boolean>>
+  composerType: ComposerType
+  setComposerType: React.Dispatch<React.SetStateAction<ComposerType>>
+  storyAudience: StoryAudienceOption
+  setStoryAudience: React.Dispatch<React.SetStateAction<StoryAudienceOption>>
+  newPostContent: string
+  setNewPostContent: React.Dispatch<React.SetStateAction<string>>
+  newPostImage: string | null
+  setNewPostImage: React.Dispatch<React.SetStateAction<string | null>>
+  instagramUrl: string
+  setInstagramUrl: React.Dispatch<React.SetStateAction<string>>
+  selectedSpaceForPost: SpaceKey | null
+  setSelectedSpaceForPost: React.Dispatch<React.SetStateAction<SpaceKey | null>>
+  pollOption1: string
+  setPollOption1: React.Dispatch<React.SetStateAction<string>>
+  pollOption2: string
+  setPollOption2: React.Dispatch<React.SetStateAction<string>>
+  fileInputRef: React.RefObject<HTMLInputElement>
+  handleImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
+  handleCreatePost: () => void
+  resetComposer: () => void
+}) {
+  if (!showComposer) return null
+
+  const closeComposer = () => {
+    setShowComposer(false)
+    resetComposer()
+  }
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm">
+      <button
+        onClick={closeComposer}
+        className="absolute inset-0"
+        aria-label="Close composer"
+      />
+
+      <div className="absolute bottom-0 left-0 right-0 max-h-[88vh] overflow-y-auto rounded-t-[34px] border-t border-primary/20 bg-[#0A0A0A] p-4 shadow-[0_-24px_70px_rgba(0,0,0,0.65)]">
+        <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-white/15" />
+
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Avatar src={user?.avatar} name={user?.name || "User"} size={44} />
+
+            <div>
+              <p className="text-[15px] font-semibold text-white">Create</p>
+              <p className="text-[12px] text-zinc-500">
+                Post, story, poll, or video
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={closeComposer}
+            className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-zinc-400"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mb-3 flex flex-wrap gap-2">
+          {(["post", "story", "poll", "video"] as ComposerType[]).map((type) => (
+            <button
+              key={type}
+              onClick={() => setComposerType(type)}
+              className={`rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
+                composerType === type
+                  ? "border-primary bg-primary text-black"
+                  : "border-white/10 bg-white/[0.04] text-zinc-300"
+              }`}
+            >
+              {type === "post" && "Post"}
+              {type === "story" && "Story 24h"}
+              {type === "poll" && "Poll"}
+              {type === "video" && "Video 24h"}
+            </button>
+          ))}
+        </div>
+
+        {(composerType === "story" || composerType === "video") && (
+          <div className="mb-3 rounded-[22px] border border-primary/15 bg-primary/5 p-3">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+              Story Audience
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {(["followers", "public", "both"] as StoryAudienceOption[]).map(
+                (audience) => (
+                  <button
+                    key={audience}
+                    onClick={() => setStoryAudience(audience)}
+                    className={`rounded-full border px-3 py-2 text-xs font-semibold ${
+                      storyAudience === audience
+                        ? "border-primary bg-primary text-black"
+                        : "border-white/10 bg-[#111111] text-zinc-300"
+                    }`}
+                  >
+                    {audience === "followers" && "Home"}
+                    {audience === "public" && "Community"}
+                    {audience === "both" && "Both"}
+                  </button>
+                )
+              )}
+            </div>
+
+            <p className="mt-2 text-[11px] text-zinc-500">
+              Home = followers, Community = public, Both = everywhere.
+            </p>
+          </div>
+        )}
+        <textarea
+          value={newPostContent}
+          onChange={(e) =>
+            setNewPostContent(
+              e.target.value.slice(0, composerType === "post" ? 280 : 180)
+            )
+          }
+          placeholder={
+            composerType === "poll"
+              ? "Ask the community something..."
+              : composerType === "story"
+                ? "Share a story..."
+                : composerType === "video"
+                  ? "Add a short video caption..."
+                  : "What's on your mind?"
+          }
+          className="w-full resize-none rounded-[22px] border border-white/10 bg-[#111111] p-3 text-[14px] leading-6 text-white outline-none placeholder:text-zinc-600 focus:border-primary"
+          rows={3}
+          autoFocus
+        />
+
+        {composerType === "poll" && (
+          <div className="mt-3 grid gap-2">
+            <Input
+              value={pollOption1}
+              onChange={(e) => setPollOption1(e.target.value.slice(0, 60))}
+              placeholder="Poll option 1"
+              className="h-10 rounded-full border-white/10 bg-[#111111] text-sm"
+            />
+
+            <Input
+              value={pollOption2}
+              onChange={(e) => setPollOption2(e.target.value.slice(0, 60))}
+              placeholder="Poll option 2"
+              className="h-10 rounded-full border-white/10 bg-[#111111] text-sm"
+            />
+          </div>
+        )}
+
+        <div className="mt-3">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
+            Space / Topic
+          </p>
+
+          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <button
+              onClick={() => setSelectedSpaceForPost(null)}
+              className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold ${
+                selectedSpaceForPost === null
+                  ? "border-primary bg-primary text-black"
+                  : "border-white/10 bg-[#111111] text-zinc-300"
+              }`}
+            >
+              General Feed
+            </button>
+
+            {spaces.map((space) => (
+              <button
+                key={space.key}
+                onClick={() => setSelectedSpaceForPost(space.key)}
+                className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold ${
+                  selectedSpaceForPost === space.key
+                    ? "border-primary bg-primary text-black"
+                    : "border-white/10 bg-[#111111] text-zinc-300"
+                }`}
+              >
+                {space.emoji} {space.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {newPostImage && (
+          <div className="relative mt-3 overflow-hidden rounded-[22px] border border-white/10">
+            <img
+              src={newPostImage}
+              alt="Preview"
+              className="h-52 w-full object-cover"
+            />
+
+            <button
+              onClick={() => setNewPostImage(null)}
+              className="absolute right-2 top-2 rounded-full bg-black/70 p-1.5 text-white backdrop-blur-md"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            {composerType === "video" && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white backdrop-blur-md">
+                  <Play className="ml-0.5 h-5 w-5 fill-white" />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-3 flex items-center gap-2 rounded-full border border-white/10 bg-[#111111] px-3 py-2">
+          <Instagram className="h-4 w-4 text-zinc-500" />
+
+          <input
+            value={instagramUrl}
+            onChange={(e) => setInstagramUrl(e.target.value)}
+            placeholder="Instagram link optional"
+            className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-zinc-600"
+          />
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-2xl border border-white/10 bg-white/[0.04] p-2 text-zinc-400 transition-colors hover:text-primary"
+            >
+              {composerType === "video" ? (
+                <Play className="h-5 w-5" />
+              ) : (
+                <ImageIcon className="h-5 w-5" />
+              )}
+            </button>
+
+            <span className="text-[11px] text-zinc-500">
+              {composerType === "video" ? "Max 60s video" : "Add media"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={closeComposer}
+              className="rounded-full"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              onClick={handleCreatePost}
+              disabled={!newPostContent.trim()}
+              size="sm"
+              className="rounded-full gap-2"
+            >
+              <Send className="h-4 w-4" />
+              Publish
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+///////////////////////////////////////////////////////////////
+// STICKY SHARE BAR — WHATSAPP / IMESSAGE STYLE
+///////////////////////////////////////////////////////////////
+
+function StickyShareBar({
+  user,
+  quickText,
+  setQuickText,
+  submitQuickPost,
+  openComposer,
+}: {
+  user: ReturnType<typeof useApp>["user"]
+  quickText: string
+  setQuickText: React.Dispatch<React.SetStateAction<string>>
+  submitQuickPost: () => void
+  openComposer: () => void
+}) {
+  return (
+    <div className="fixed bottom-[92px] left-0 right-0 z-40 px-3">
+      <div className="mx-auto flex max-w-xl items-center gap-2 rounded-[26px] border border-primary/20 bg-[#0f0f0f]/95 p-2 shadow-[0_16px_45px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+        <button
+          onClick={openComposer}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-black shadow-[0_0_18px_rgba(201,168,76,0.28)] active:scale-[0.94]"
+        >
+          <Plus className="h-6 w-6 stroke-[2.4]" />
+        </button>
+
+        <input
+          value={quickText}
+          onChange={(e) => setQuickText(e.target.value.slice(0, 160))}
+          placeholder="Share something..."
+          className="h-11 min-w-0 flex-1 rounded-full border border-white/10 bg-white/[0.05] px-4 text-[14px] text-white outline-none placeholder:text-zinc-500 focus:border-primary/40"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault()
+              submitQuickPost()
+            }
+          }}
+        />
+
+        <button
+          onClick={quickText.trim() ? submitQuickPost : openComposer}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-zinc-300 active:scale-[0.94]"
+        >
+          {quickText.trim() ? <Send className="h-5 w-5" /> : <ImageIcon className="h-5 w-5" />}
+        </button>
+      </div>
+    </div>
+  )
+}
+///////////////////////////////////////////////////////////////
+// COMMUNITY SCREEN
+///////////////////////////////////////////////////////////////
+
+export function CommunityScreen() {
+  const {
+    user,
+    creators,
+    communityPosts,
+    createCommunityPost,
+    toggleCommunityLike,
+    addCommunityComment,
+    addCommunityReply,
+    voteOnPoll,
+    openCreatorProfile,
+    toggleFollow,
+    getTopCreators,
+    getStoriesForSource,
+    spaces,
+    openSpace,
+    setCurrentScreen,
+  } = useApp()
+
+  const [newPostContent, setNewPostContent] = useState("")
+  const [newPostImage, setNewPostImage] = useState<string | null>(null)
+  const [instagramUrl, setInstagramUrl] = useState("")
+  const [showComposer, setShowComposer] = useState(false)
+  const [composerType, setComposerType] = useState<ComposerType>("post")
+  const [storyAudience, setStoryAudience] = useState<StoryAudienceOption>("both")
+  const [quickText, setQuickText] = useState("")
+  const [expandedComments, setExpandedComments] = useState<string[]>([])
+  const [commentText, setCommentText] = useState<Record<string, string>>({})
+  const [replyText, setReplyText] = useState<Record<string, string>>({})
+  const [replyingTo, setReplyingTo] = useState<{
+    postId: string
+    commentId: string
+  } | null>(null)
+
+  const [pollOption1, setPollOption1] = useState("")
+  const [pollOption2, setPollOption2] = useState("")
+  const [selectedSpaceForPost, setSelectedSpaceForPost] =
+    useState<SpaceKey | null>(null)
+
+  const [showCreators, setShowCreators] = useState(false)
+  const [showSpaces, setShowSpaces] = useState(false)
+  const [trendingExpanded, setTrendingExpanded] = useState(false)
+  
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const topCreators = useMemo(() => getTopCreators(), [creators])
+  const publicStories = getStoriesForSource("community")
+
+  const storyIds = useMemo(() => {
+    return publicStories.map((story) => story.id)
+  }, [publicStories])
+
+  const visibleFeedPosts = useMemo(() => {
+    return communityPosts.filter(
+      (post) => post.type === "post" || post.type === "poll" || post.type === "video"
+    )
+  }, [communityPosts])
+
+  const trendingPosts = useMemo(() => {
+    return [...visibleFeedPosts].sort((a, b) => b.likes - a.likes).slice(0, 3)
+  }, [visibleFeedPosts])
+
+  const resetComposer = () => {
+    setNewPostContent("")
+    setNewPostImage(null)
+    setInstagramUrl("")
+    setComposerType("post")
+    setStoryAudience("both")
+    setPollOption1("")
+    setPollOption2("")
+    setSelectedSpaceForPost(null)
+  }
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      setNewPostImage(event.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleCreatePost = () => {
+    const trimmed = newPostContent.trim()
+    if (!trimmed) return
+
+    if (composerType === "poll" && (!pollOption1.trim() || !pollOption2.trim())) {
+      return
+    }
+
+    createCommunityPost({
+      content: trimmed,
+      image: newPostImage || undefined,
+      instagramUrl: instagramUrl.trim() || undefined,
+      type: composerType,
+      audience:
+        composerType === "story" || composerType === "video"
+          ? storyAudience
+          : undefined,
+      pollOptions:
+        composerType === "poll"
+          ? [pollOption1.trim(), pollOption2.trim()].filter(Boolean)
+          : undefined,
+      spaceKey: selectedSpaceForPost,
+    })
+
+    resetComposer()
+    setShowComposer(false)
+  }
+const submitQuickPost = () => {
+  const trimmed = quickText.trim()
+  if (!trimmed) return
+
+  createCommunityPost({
+    content: trimmed,
+    type: "post",
+    image: undefined,
+    instagramUrl: undefined,
+    spaceKey: null,
+  })
+
+  setQuickText("")
+}
+  const toggleComments = (postId: string) => {
+    setExpandedComments((prev) =>
+      prev.includes(postId)
+        ? prev.filter((id) => id !== postId)
+        : [...prev, postId]
+    )
+  }
+
+  const handleShare = async (text: string, instagramLink?: string) => {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ text })
+        return
+      } catch {}
+    }
+
+    if (instagramLink && typeof window !== "undefined") {
+      window.open(instagramLink, "_blank", "noopener,noreferrer")
+    }
+  }
+
+  return (
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
+      <TopHeader title="Community" showProfile />
+
+<div className="flex-1 overflow-y-auto pb-52">
+        <div className="px-4 pt-4">
+          <CommunityHero />
+        </div>
+
+        <StoriesSection storyIds={storyIds} />
+
+        <TopCreatorsStrip
+          creators={topCreators}
+          openCreatorProfile={openCreatorProfile}
+          toggleFollow={toggleFollow}
+          showCreators={showCreators}
+          setShowCreators={setShowCreators}
+        />
+
+        <SpacesPreview
+         spaces={spaces}
+         openSpace={openSpace}
+        openExplore={() => setCurrentScreen("spaces")}
+        showSpaces={showSpaces}
+        setShowSpaces={setShowSpaces}
+        />
+
+        <TrendingPreview
+          trendingPosts={trendingPosts}
+          creators={creators}
+          openCreatorProfile={openCreatorProfile}
+          expanded={trendingExpanded}
+          setExpanded={setTrendingExpanded}
+        />
+
+        <div className="pt-2">
+          {visibleFeedPosts.map((post) => {
+            const creator = creators.find((item) => item.id === post.authorId)
+            if (!creator) return null
+
+            return (
+              <PostCard
+                key={post.id}
+                post={post}
+                creator={creator}
+                user={user}
+                openCreatorProfile={openCreatorProfile}
+                openSpace={openSpace}
+                voteOnPoll={voteOnPoll}
+                toggleCommunityLike={toggleCommunityLike}
+                expandedComments={expandedComments}
+                toggleComments={toggleComments}
+                handleShare={handleShare}
+                commentText={commentText}
+                setCommentText={setCommentText}
+                replyText={replyText}
+                setReplyText={setReplyText}
+                replyingTo={replyingTo}
+                setReplyingTo={setReplyingTo}
+                addCommunityComment={addCommunityComment}
+                addCommunityReply={addCommunityReply}
+              />
+            )
+          })}
+        </div>
+      </div>
+
+      <ComposerSheet
+        user={user}
+        spaces={spaces}
+        showComposer={showComposer}
+        setShowComposer={setShowComposer}
+        composerType={composerType}
+        setComposerType={setComposerType}
+        storyAudience={storyAudience}
+        setStoryAudience={setStoryAudience}
+        newPostContent={newPostContent}
+        setNewPostContent={setNewPostContent}
+        newPostImage={newPostImage}
+        setNewPostImage={setNewPostImage}
+        instagramUrl={instagramUrl}
+        setInstagramUrl={setInstagramUrl}
+        selectedSpaceForPost={selectedSpaceForPost}
+        setSelectedSpaceForPost={setSelectedSpaceForPost}
+        pollOption1={pollOption1}
+        setPollOption1={setPollOption1}
+        pollOption2={pollOption2}
+        setPollOption2={setPollOption2}
+        fileInputRef={fileInputRef}
+        handleImageSelect={handleImageSelect}
+        handleCreatePost={handleCreatePost}
+        resetComposer={resetComposer}
+      />
+
+     <StickyShareBar
+  user={user}
+  quickText={quickText}
+  setQuickText={setQuickText}
+  submitQuickPost={submitQuickPost}
+  openComposer={() => setShowComposer(true)}
+/>
+
+      <BottomNav />
+    </div>
+  )
+}

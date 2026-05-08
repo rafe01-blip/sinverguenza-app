@@ -1,0 +1,2188 @@
+"use client"
+
+import type React from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import Image from "next/image"
+import {
+  Bell,
+  Bookmark,
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Heart,
+  MapPin,
+  MessageCircle,
+  Pin,
+  Play,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  X,
+} from "lucide-react"
+
+import { useApp } from "@/lib/app-context"
+import type { EventType } from "@/lib/app-context"
+import { TopHeader } from "@/components/navigation/top-header"
+import { BottomNav } from "@/components/navigation/bottom-nav"
+
+type FilterKey =
+  | "public"
+  | "private"
+  | "free"
+  | "paid"
+  | "offCampus"
+  | "workshop"
+  | "individual"
+  | "dance"
+  | "gaming"
+  | "sports"
+  | "social"
+  | "family"
+  | "food"
+  | "networking"
+  | "party"
+  | "culture"
+  | "music"
+  | "outdoor"
+  | "class"
+
+type CalendarMode = "focus" | "expand"
+
+type BadgeTone =
+  | "default"
+  | "gold"
+  | "emerald"
+  | "orange"
+  | "pink"
+  | "cyan"
+  | "purple"
+
+type QuickChipKey =
+  | "today"
+  | "week"
+  | "saved"
+  | "pinned"
+  | "free"
+  | "paid"
+  | "dance"
+  | "public"
+  | "workshop"
+
+type EventGroup = {
+  key: string
+  title: string
+  subtitle: string
+  eyebrow: string
+  events: EventType[]
+}
+
+const GOLD = "#C9A84C"
+const DARK = "#0A0A0A"
+const CARD = "#121212"
+
+const FALLBACK_IMAGE = "/images/placeholders/sv-placeholder-dark.jpg"
+
+const INITIAL_VISIBLE_PER_GROUP = 3
+const INITIAL_VISIBLE_SELECTED_DAY = 3
+const INITIAL_VISIBLE_PINNED = 3
+
+const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
+  { key: "public", label: "🌐 Public" },
+  { key: "private", label: "🔒 Private" },
+  { key: "free", label: "🎉 Free" },
+  { key: "paid", label: "💰 Paid" },
+  { key: "offCampus", label: "📍 Off Campus" },
+  { key: "workshop", label: "🎓 Workshop" },
+  { key: "individual", label: "👤 Individual" },
+  { key: "dance", label: "💃 Dance" },
+  { key: "gaming", label: "🎮 Gaming" },
+  { key: "sports", label: "⚽ Sports" },
+  { key: "social", label: "🍷 Social" },
+  { key: "family", label: "🧑‍🧑‍🧒‍🧒 Family" },
+  { key: "food", label: "🍔 Food" },
+  { key: "networking", label: "🤝 Networking" },
+  { key: "party", label: "🎉 Party" },
+  { key: "culture", label: "🎭 Culture" },
+  { key: "music", label: "🎵 Music" },
+  { key: "outdoor", label: "🌿 Outdoor" },
+  { key: "class", label: "📚 Class" },
+]
+
+const QUICK_CHIPS: {
+  key: QuickChipKey
+  label: string
+  filter?: FilterKey
+}[] = [
+  { key: "today", label: "Today" },
+  { key: "week", label: "This Week" },
+  { key: "saved", label: "Saved" },
+  { key: "pinned", label: "Pinned" },
+  { key: "free", label: "Free", filter: "free" },
+  { key: "paid", label: "Paid", filter: "paid" },
+  { key: "dance", label: "Dance", filter: "dance" },
+  { key: "public", label: "Public", filter: "public" },
+  { key: "workshop", label: "Workshops", filter: "workshop" },
+]
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+]
+
+const DAY_NAMES = ["S", "M", "T", "W", "T", "F", "S"]
+
+function cn(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ")
+}
+function safeImage(src?: string | null) {
+  if (!src) return FALLBACK_IMAGE
+
+  const normalized = src.trim()
+
+  if (
+    !normalized ||
+    normalized === "/placeholder.svg" ||
+    normalized.includes("placeholder.svg")
+  ) {
+    return FALLBACK_IMAGE
+  }
+
+  return normalized
+}
+
+function formatDateString(date: Date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+
+  return `${y}-${m}-${d}`
+}
+
+function parseDate(dateString?: string | null) {
+  if (!dateString) return new Date()
+
+  const date = new Date(`${dateString}T00:00:00`)
+
+  if (Number.isNaN(date.getTime())) return new Date()
+
+  return date
+}
+
+function formatTime12h(time?: string | null) {
+  if (!time) return "Time TBA"
+
+  const [rawHours, rawMinutes] = time.split(":").map(Number)
+
+  if (Number.isNaN(rawHours)) return time
+
+  const hours = rawHours
+  const minutes = Number.isNaN(rawMinutes) ? 0 : rawMinutes
+  const period = hours >= 12 ? "PM" : "AM"
+  const displayHours = hours % 12 || 12
+
+  return `${displayHours}:${minutes
+    .toString()
+    .padStart(2, "0")} ${period}`
+}
+
+function formatDateTitle(dateString: string) {
+  return parseDate(dateString).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
+function formatShortDate(dateString: string) {
+  return parseDate(dateString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  })
+}
+
+function formatTinyDate(dateString: string) {
+  return parseDate(dateString).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  })
+}
+
+function getTodayString() {
+  return formatDateString(new Date())
+}
+
+function getTomorrowString() {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  return formatDateString(tomorrow)
+}
+
+function getWeekRangeFrom(dateString: string) {
+  const base = parseDate(dateString)
+  const end = new Date(base)
+
+  end.setDate(base.getDate() + 6)
+
+  return {
+    start: formatDateString(base),
+    end: formatDateString(end),
+  }
+}
+
+function isDateWithinRange(
+  dateString: string,
+  startString: string,
+  endString: string
+) {
+  const date = parseDate(dateString).getTime()
+  const start = parseDate(startString).getTime()
+  const end = parseDate(endString).getTime()
+
+  return date >= start && date <= end
+}
+
+function getCategoryLabel(event: EventType) {
+  if (event.category === "class") return "Class"
+  if (event.category === "announcement") return "Announcement"
+
+  return "Event"
+}
+
+function getVisibilityLabel(event: EventType) {
+  if (event.visibility === "private" || event.isPublic === false) {
+    return "Private"
+  }
+
+  return "Public"
+}
+
+function isEventFree(event: EventType) {
+  return (
+    event.isFree ||
+    event.pricing === "free" ||
+    event.price === 0
+  )
+}
+
+function getEventTags(event: EventType) {
+  return event.audienceTags ?? []
+}
+
+function isEventOffCampus(event: EventType) {
+  return (
+    event.isOffCampus ||
+    event.activityTypes?.includes("off-campus") ||
+    event.activityTypes?.includes("off campus") ||
+    getEventTags(event).includes("off-campus") ||
+    false
+  )
+}
+
+function isEventWorkshop(event: EventType) {
+  return (
+    event.isWorkshop ||
+    event.activityTypes?.includes("workshop") ||
+    getEventTags(event).includes("workshop") ||
+    event.category === "class" ||
+    false
+  )
+}
+
+function isEventDance(event: EventType) {
+  return (
+    event.isDance ||
+    event.activityTypes?.includes("dance") ||
+    getEventTags(event).includes("dance") ||
+    false
+  )
+}
+function getEventTimestamp(event: EventType) {
+  return new Date(`${event.date}T${event.time || "00:00"}`).getTime()
+}
+
+function isFutureEvent(event: EventType) {
+  return getEventTimestamp(event) >= Date.now() - 60 * 1000
+}
+
+function getEventMediaType(event: EventType) {
+  const mediaType = event.mediaType?.toLowerCase()
+  const mediaUrl = event.mediaUrl || event.image || ""
+
+  if (mediaType === "video") return "video"
+  if (mediaUrl.match(/\.(mp4|mov|webm|m4v)$/i)) return "video"
+
+  return "image"
+}
+
+function getEventImage(event: EventType) {
+  if (event.mediaThumbnail) return safeImage(event.mediaThumbnail)
+
+  if (event.mediaUrl && getEventMediaType(event) === "image") {
+    return safeImage(event.mediaUrl)
+  }
+
+  if (event.image) return safeImage(event.image)
+
+  const galleryImage = event.mediaGallery?.find((item) => {
+    if (typeof item === "string") return true
+
+    const itemType = item.type?.toLowerCase()
+    return itemType === "image" || !itemType
+  })
+
+  if (typeof galleryImage === "string") return safeImage(galleryImage)
+
+  return safeImage(galleryImage?.url)
+}
+
+function getEventHost(event: EventType) {
+  const host: any = event.host
+  const postedBy: any = event.postedBy
+
+  return (
+    host?.name ||
+    host?.displayName ||
+    event.hostName ||
+    event.organizer ||
+    event.creatorName ||
+    postedBy?.name ||
+    event.postedByName ||
+    "Sin Vergüenza"
+  )
+}
+
+function getEventLocationLabel(event: EventType) {
+  if (event.locationType === "online" || event.onlineLink) return "Online"
+  if (event.location) return event.location
+
+  return "Location TBA"
+}
+
+function getEventPriceLabel(event: EventType) {
+  if (isEventFree(event)) return "Free"
+
+  if (typeof event.price === "number" && event.price > 0) {
+    return `$${event.price}`
+  }
+
+  return "Paid"
+}
+
+function getCardToneTags(event: EventType) {
+  const tags: { label: string; tone: BadgeTone }[] = [
+    { label: getCategoryLabel(event), tone: "gold" },
+    {
+      label: getVisibilityLabel(event),
+      tone: getVisibilityLabel(event) === "Public" ? "emerald" : "orange",
+    },
+    {
+      label: getEventPriceLabel(event),
+      tone: isEventFree(event) ? "emerald" : "orange",
+    },
+  ]
+
+  if (event.locationType === "online" || event.onlineLink) {
+    tags.push({ label: "Online", tone: "cyan" })
+  }
+
+  if (isEventWorkshop(event)) {
+    tags.push({
+      label: event.category === "class" ? "Class" : "Workshop",
+      tone: "purple",
+    })
+  }
+
+  if (isEventDance(event)) {
+    tags.push({ label: "Dance", tone: "pink" })
+  }
+
+  if (event.isPinned) {
+    tags.push({ label: "Pinned", tone: "gold" })
+  }
+
+  return tags
+}
+
+function Badge({
+  label,
+  tone = "default",
+  compact = false,
+}: {
+  label: string
+  tone?: BadgeTone
+  compact?: boolean
+}) {
+  const toneStyles =
+    tone === "gold"
+      ? "border-[#C9A84C]/25 bg-[#C9A84C]/12 text-[#E8D39A]"
+      : tone === "emerald"
+      ? "border-emerald-500/25 bg-emerald-500/12 text-emerald-300"
+      : tone === "orange"
+      ? "border-orange-500/25 bg-orange-500/12 text-orange-300"
+      : tone === "pink"
+      ? "border-pink-500/25 bg-pink-500/12 text-pink-300"
+      : tone === "cyan"
+      ? "border-cyan-500/25 bg-cyan-500/12 text-cyan-300"
+      : tone === "purple"
+      ? "border-purple-500/25 bg-purple-500/12 text-purple-300"
+      : "border-white/10 bg-white/[0.045] text-white/70"
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border font-medium backdrop-blur-sm transition-all duration-300",
+        compact
+          ? "px-2 py-[5px] text-[9px] tracking-[0.12em]"
+          : "px-2.5 py-[6px] text-[10px] tracking-[0.12em]",
+        toneStyles
+      )}
+    >
+      {label}
+    </span>
+  )
+}
+function SectionTitle({
+  eyebrow,
+  title,
+  subtitle,
+  action,
+}: {
+  eyebrow?: string
+  title: string
+  subtitle?: string
+  action?: React.ReactNode
+}) {
+  return (
+    <div className="flex items-end justify-between gap-4">
+      <div className="min-w-0">
+        {eyebrow && (
+          <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.26em] text-[#C9A84C]/70">
+            {eyebrow}
+          </p>
+        )}
+
+        <h2 className="font-serif text-[21px] font-semibold tracking-[-0.03em] text-white">
+          {title}
+        </h2>
+
+        {subtitle && (
+          <p className="mt-1 line-clamp-1 text-[12px] text-white/43">
+            {subtitle}
+          </p>
+        )}
+      </div>
+
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
+  )
+}
+
+function MicroAction({
+  icon,
+  value,
+  active = false,
+}: {
+  icon: React.ReactNode
+  value?: string | number
+  active?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-medium transition-all duration-300",
+        active
+          ? "border-[#C9A84C]/25 bg-[#C9A84C]/10 text-[#E8D39A]"
+          : "border-white/10 bg-white/[0.04] text-white/58"
+      )}
+    >
+      {icon}
+
+      {value !== undefined && (
+        <span className="leading-none">
+          {value}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function PremiumDivider() {
+  return (
+    <div className="relative h-px w-full overflow-hidden">
+      <div className="absolute inset-0 bg-white/[0.06]" />
+      <div className="absolute left-0 top-0 h-full w-[22%] bg-gradient-to-r from-[#C9A84C]/0 via-[#C9A84C]/30 to-[#C9A84C]/0" />
+    </div>
+  )
+}
+
+function EmptyState({
+  title,
+  subtitle,
+  cta,
+}: {
+  title: string
+  subtitle: string
+  cta?: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+      <div className="relative mb-5 flex h-[78px] w-[78px] items-center justify-center rounded-full border border-[#C9A84C]/20 bg-[#C9A84C]/10">
+        <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,rgba(201,168,76,0.16),transparent_70%)]" />
+        <Sparkles className="relative z-[2] h-8 w-8 text-[#C9A84C]" />
+      </div>
+
+      <h3 className="font-serif text-[24px] font-semibold tracking-[-0.02em] text-white">
+        {title}
+      </h3>
+
+      <p className="mt-2 max-w-[290px] text-[13px] leading-relaxed text-white/45">
+        {subtitle}
+      </p>
+
+      {cta && <div className="mt-6">{cta}</div>}
+    </div>
+  )
+}
+
+function PremiumToggle({
+  value,
+  onChange,
+}: {
+  value: CalendarMode
+  onChange: (mode: CalendarMode) => void
+}) {
+  return (
+    <div className="relative flex rounded-full border border-white/10 bg-[#121212]/95 p-1 backdrop-blur-xl">
+      <div
+        className={cn(
+          "absolute top-1 h-[36px] w-[calc(50%-4px)] rounded-full border border-[#C9A84C]/25 bg-[#C9A84C]/14 shadow-[0_0_24px_rgba(201,168,76,0.10)] transition-all duration-300",
+          value === "focus" ? "left-1" : "left-[calc(50%+2px)]"
+        )}
+      />
+
+      <button
+        onClick={() => onChange("focus")}
+        className={cn(
+          "relative z-[2] min-w-[110px] rounded-full px-4 py-2.5 text-[12px] font-medium tracking-[0.08em] transition-all duration-300",
+          value === "focus" ? "text-[#F6E7BA]" : "text-white/55"
+        )}
+      >
+        Focus
+      </button>
+
+      <button
+        onClick={() => onChange("expand")}
+        className={cn(
+          "relative z-[2] min-w-[110px] rounded-full px-4 py-2.5 text-[12px] font-medium tracking-[0.08em] transition-all duration-300",
+          value === "expand" ? "text-[#F6E7BA]" : "text-white/55"
+        )}
+      >
+        Expand
+      </button>
+    </div>
+  )
+}
+
+function QuickChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string
+  active?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "group relative shrink-0 overflow-hidden rounded-full border px-4 py-2.5 text-[11px] font-medium tracking-[0.08em] backdrop-blur-md transition-all duration-300 active:scale-[0.97]",
+        active
+          ? "border-[#C9A84C]/30 bg-[#C9A84C]/14 text-[#F5E4B2] shadow-[0_0_20px_rgba(201,168,76,0.08)]"
+          : "border-white/10 bg-white/[0.04] text-white/65 hover:border-white/15 hover:bg-white/[0.06]"
+      )}
+    >
+      <div
+        className={cn(
+          "absolute inset-0 opacity-0 transition-opacity duration-300",
+          active && "opacity-100"
+        )}
+        style={{
+          background:
+            "linear-gradient(135deg, rgba(201,168,76,0.10), rgba(201,168,76,0.02))",
+        }}
+      />
+
+      <span className="relative z-[2]">
+        {label}
+      </span>
+    </button>
+  )
+}
+function HeaderStat({
+  icon,
+  label,
+  active = false,
+}: {
+  icon: React.ReactNode
+  label: string
+  active?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[11px] font-medium backdrop-blur-sm transition-all duration-300",
+        active
+          ? "border-[#C9A84C]/25 bg-[#C9A84C]/12 text-[#F6E7BA]"
+          : "border-white/10 bg-white/[0.04] text-white/55"
+      )}
+    >
+      {icon}
+      <span>{label}</span>
+    </div>
+  )
+}
+
+function FocusDayPill({
+  date,
+  selected,
+  eventsCount,
+  onClick,
+}: {
+  date: Date
+  selected: boolean
+  eventsCount: number
+  onClick: () => void
+}) {
+  const hasEvents = eventsCount > 0
+  const dayNumber = date.toLocaleDateString("en-US", { day: "numeric" })
+  const weekday = date.toLocaleDateString("en-US", { weekday: "short" })
+  const month = date.toLocaleDateString("en-US", { month: "short" })
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "group relative min-w-[76px] shrink-0 overflow-hidden rounded-[22px] border px-3 py-3 text-center backdrop-blur-xl transition-all duration-300 active:scale-[0.97]",
+        selected
+          ? "border-[#C9A84C]/40 bg-[#C9A84C]/14 text-white shadow-[0_0_28px_rgba(201,168,76,0.13)]"
+          : "border-white/10 bg-white/[0.045] text-white/65 hover:border-white/15 hover:bg-white/[0.06]"
+      )}
+    >
+      <div
+        className={cn(
+          "absolute inset-0 opacity-0 transition-opacity duration-300",
+          selected && "opacity-100"
+        )}
+        style={{
+          background:
+            "radial-gradient(circle at 50% 0%, rgba(201,168,76,0.22), transparent 62%)",
+        }}
+      />
+
+      <div className="relative z-[2]">
+        <div
+          className={cn(
+            "text-[9px] font-semibold uppercase tracking-[0.18em]",
+            selected ? "text-[#F5E4B2]" : "text-white/40"
+          )}
+        >
+          {weekday}
+        </div>
+
+        <div
+          className={cn(
+            "mt-1 font-serif text-[24px] font-semibold leading-none tracking-[-0.04em]",
+            selected ? "text-white" : "text-white/80"
+          )}
+        >
+          {dayNumber}
+        </div>
+
+        <div
+          className={cn(
+            "mt-1 text-[9px] uppercase tracking-[0.16em]",
+            selected ? "text-white/50" : "text-white/30"
+          )}
+        >
+          {month}
+        </div>
+
+        <div className="mt-2 flex h-2 items-center justify-center gap-1">
+          {hasEvents ? (
+            Array.from({ length: Math.min(eventsCount, 3) }).map((_, index) => (
+              <span
+                key={index}
+                className={cn(
+                  "h-1.5 rounded-full transition-all duration-300",
+                  selected ? "bg-[#C9A84C]" : "bg-[#C9A84C]/60",
+                  index === 0 && selected ? "w-3" : "w-1.5"
+                )}
+              />
+            ))
+          ) : (
+            <span className="h-1.5 w-1.5 rounded-full bg-white/10" />
+          )}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function MonthDayCell({
+  day,
+  selected,
+  events,
+  onClick,
+}: {
+  day: number
+  selected: boolean
+  events: EventType[]
+  onClick: () => void
+}) {
+  const hasEvents = events.length > 0
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "group relative flex h-[42px] items-center justify-center overflow-hidden rounded-[13px] border text-[13px] font-medium transition-all duration-300 active:scale-[0.96]",
+        selected
+          ? "border-[#C9A84C]/45 bg-[#C9A84C]/16 text-[#F8E9BC] shadow-[0_0_20px_rgba(201,168,76,0.12)]"
+          : "border-white/[0.07] bg-white/[0.035] text-white/70 hover:border-white/12 hover:bg-white/[0.055]"
+      )}
+    >
+      <div
+        className={cn(
+          "absolute inset-0 opacity-0 transition-opacity duration-300",
+          selected && "opacity-100"
+        )}
+        style={{
+          background:
+            "radial-gradient(circle at 50% 0%, rgba(201,168,76,0.16), transparent 62%)",
+        }}
+      />
+
+      <span className="relative z-[2]">
+        {day}
+      </span>
+
+      {hasEvents && (
+        <div className="absolute bottom-1.5 left-1/2 z-[2] flex -translate-x-1/2 items-center gap-[3px]">
+          {events.slice(0, 3).map((event, index) => (
+            <span
+              key={`${event.id}-${index}`}
+              className={cn(
+                "h-1 rounded-full transition-all duration-300",
+                selected
+                  ? "bg-[#F8E9BC]"
+                  : event.isPinned
+                  ? "bg-[#C9A84C]"
+                  : "bg-white/35",
+                index === 0 ? "w-2" : "w-1"
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </button>
+  )
+}
+function PinnedHighlightCard({
+  event,
+  onOpen,
+}: {
+  event: EventType
+  onOpen: () => void
+}) {
+  const image = getEventImage(event)
+  const mediaType = getEventMediaType(event)
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group relative min-w-[236px] overflow-hidden rounded-[24px] border border-[#C9A84C]/20 bg-[#121212] text-left shadow-[0_18px_45px_rgba(0,0,0,0.24)] transition-all duration-300 hover:border-[#C9A84C]/32 active:scale-[0.985]"
+    >
+      <div className="relative h-[126px] overflow-hidden">
+        <Image
+          src={image}
+          alt={event.title}
+          fill
+          className="object-cover transition-transform duration-700 group-hover:scale-[1.035]"
+        />
+
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,168,76,0.20),transparent_52%)]" />
+
+        <div className="absolute left-3 top-3">
+          <Badge label="Pinned" tone="gold" compact />
+        </div>
+
+        {mediaType === "video" && (
+          <div className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/45 backdrop-blur-md">
+            <Play className="ml-0.5 h-3.5 w-3.5 fill-white text-white" />
+          </div>
+        )}
+
+        <div className="absolute bottom-3 left-3 right-3">
+          <h3 className="line-clamp-2 font-serif text-[18px] font-semibold leading-[1.08] tracking-[-0.03em] text-white">
+            {event.title}
+          </h3>
+        </div>
+      </div>
+
+      <div className="space-y-2 px-3 pb-3 pt-2.5">
+        <div className="flex items-center gap-2 text-[11px] text-white/55">
+          <Clock className="h-3.5 w-3.5 text-[#C9A84C]" />
+          <span>
+            {formatTinyDate(event.date)} · {formatTime12h(event.time)}
+          </span>
+        </div>
+
+        <div className="flex min-w-0 items-center gap-2 text-[11px] text-white/45">
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-[#C9A84C]" />
+          <span className="truncate">
+            {getEventLocationLabel(event)}
+          </span>
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function ViewMoreButton({
+  expanded,
+  hiddenCount,
+  onClick,
+}: {
+  expanded: boolean
+  hiddenCount: number
+  onClick: () => void
+}) {
+  if (hiddenCount <= 0 && !expanded) return null
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mx-auto mt-3 flex items-center justify-center rounded-full border border-white/10 bg-white/[0.045] px-5 py-2.5 text-[12px] font-medium text-white/65 backdrop-blur-md transition-all duration-300 hover:border-[#C9A84C]/25 hover:bg-[#C9A84C]/10 hover:text-[#F6E7BA] active:scale-[0.98]"
+    >
+      {expanded
+        ? "Show Less"
+        : `View More ${hiddenCount > 0 ? `(${hiddenCount})` : ""}`}
+    </button>
+  )
+}
+
+function CompactEventCard({
+  event,
+  onOpen,
+  onToggleSave,
+  isOpening = false,
+  index = 0,
+  mounted = true,
+  highlighted = false,
+}: {
+  event: EventType
+  onOpen: () => void
+  onToggleSave?: (eventId: string) => void
+  isOpening?: boolean
+  index?: number
+  mounted?: boolean
+  highlighted?: boolean
+}) {
+  const image = getEventImage(event)
+  const mediaType = getEventMediaType(event)
+  const tags = getCardToneTags(event).slice(0, 5)
+  const commentsCount = event.comments?.length ?? event.commentsCount ?? 0
+  const host = getEventHost(event)
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={cn(
+        "group mx-auto w-full max-w-[410px] overflow-hidden rounded-[26px] border text-left backdrop-blur-xl transition-all duration-300 active:scale-[0.985]",
+        highlighted || event.isPinned
+          ? "border-[#C9A84C]/35 bg-[#121212] shadow-[0_0_26px_rgba(201,168,76,0.10),0_18px_46px_rgba(0,0,0,0.28)]"
+          : "border-white/10 bg-[#121212]/95 shadow-[0_16px_42px_rgba(0,0,0,0.20)] hover:border-[#C9A84C]/22"
+      )}
+      style={{
+        transform: isOpening
+          ? "scale(0.985)"
+          : mounted
+          ? "translateY(0px)"
+          : "translateY(12px)",
+        opacity: mounted ? (isOpening ? 0.82 : 1) : 0,
+        transition:
+          "transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms ease, border-color 260ms ease, box-shadow 300ms ease",
+        transitionDelay: mounted ? `${Math.min(index * 42, 210)}ms` : "0ms",
+      }}
+    >
+      <div className="relative p-2.5">
+        <div className="flex gap-3">
+          <div className="relative h-[104px] w-[104px] shrink-0 overflow-hidden rounded-[21px] border border-white/10 bg-white/[0.04]">
+            <Image
+              src={image}
+              alt={event.title}
+              fill
+              className="object-cover transition-transform duration-700 group-hover:scale-[1.035]"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />
+
+            {mediaType === "video" && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/45 shadow-[0_0_22px_rgba(0,0,0,0.35)] backdrop-blur-md">
+                  <Play className="ml-0.5 h-4 w-4 fill-white text-white" />
+                </div>
+              </div>
+            )}
+
+            {mediaType === "video" && event.mediaDuration && (
+              <div className="absolute bottom-2 right-2 rounded-full border border-white/15 bg-black/55 px-2 py-1 text-[9px] font-medium text-white/85 backdrop-blur-md">
+                {event.mediaDuration}
+              </div>
+            )}
+
+            {event.isPinned && (
+              <div className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border border-[#C9A84C]/25 bg-black/45 backdrop-blur-md">
+                <Bookmark className="h-3 w-3 fill-[#C9A84C] text-[#C9A84C]" />
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1 py-1 pr-1">
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {tags.slice(0, 3).map((tag, tagIndex) => (
+                <Badge
+                  key={`${event.id}-${tag.label}-${tagIndex}`}
+                  label={tag.label}
+                  tone={tag.tone}
+                  compact
+                />
+              ))}
+            </div>
+
+            <h3 className="line-clamp-2 font-serif text-[18px] font-semibold leading-[1.08] tracking-[-0.03em] text-white">
+              {event.title}
+            </h3>
+
+            <div className="mt-2 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-[11px] text-white/55">
+                <Clock className="h-3.5 w-3.5 shrink-0 text-[#C9A84C]" />
+                <span>
+                  {formatShortDate(event.date)} · {formatTime12h(event.time)}
+                </span>
+              </div>
+
+              <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-white/45">
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-[#C9A84C]" />
+                <span className="truncate">
+                  {getEventLocationLabel(event)}
+                </span>
+              </div>
+
+              <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-white/40">
+                <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#C9A84C]/80" />
+                <span className="truncate">
+                  Hosted by {host}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {tags.length > 3 && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5 px-0.5">
+            {tags.slice(3).map((tag, tagIndex) => (
+              <Badge
+                key={`${event.id}-extra-${tag.label}-${tagIndex}`}
+                label={tag.label}
+                tone={tag.tone}
+                compact
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <PremiumDivider />
+
+      <div className="flex items-center justify-between px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={(eventClick) => {
+              eventClick.stopPropagation()
+              onToggleSave?.(event.id)
+            }}
+            className="transition-all duration-200 active:scale-90"
+          >
+            <MicroAction
+              icon={
+                <Bookmark
+                  className={cn(
+                    "h-3.5 w-3.5 transition-transform duration-200",
+                    event.isSaved &&
+                      "fill-[#C9A84C] text-[#C9A84C] drop-shadow-[0_0_8px_rgba(201,168,76,0.45)]"
+                  )}
+                />
+              }
+              value={event.isSaved ? "Saved" : "Save"}
+              active={event.isSaved}
+            />
+          </button>
+
+          <MicroAction
+            icon={<MessageCircle className="h-3.5 w-3.5" />}
+            value={commentsCount}
+          />
+        </div>
+
+        <span className="rounded-full border border-[#C9A84C]/20 bg-[#C9A84C]/10 px-3 py-1.5 text-[11px] font-medium text-[#F6E7BA] transition-all duration-300 group-hover:border-[#C9A84C]/35 group-hover:bg-[#C9A84C]/14">
+          Details
+        </span>
+      </div>
+    </button>
+  )
+}
+
+export function CalendarScreen() {
+  const {
+    events,
+    setSelectedEvent,
+    setLastEventSource,
+    setCurrentScreen,
+    calendarFilters,
+    setCalendarFilters,
+    selectedDate,
+    setSelectedDate,
+    setCurrentMonth,
+    calendarSearchOpen,
+    setCalendarSearchOpen,
+    calendarSearchQuery,
+    setCalendarSearchQuery,
+    calendarViewMode,
+    setCalendarViewMode,
+    calendarHighlightedEventId,
+    setCalendarHighlightedEventId,
+    getPinnedEvents,
+    getSavedEvents,
+    toggleSave,
+  } = useApp()
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [openingEventId, setOpeningEventId] = useState<string | null>(null)
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+  const [selectedDayExpanded, setSelectedDayExpanded] = useState(false)
+  const [quickScope, setQuickScope] = useState<QuickChipKey | null>(null)
+
+  const daysStripRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setMounted(true), 40)
+
+    return () => window.clearTimeout(id)
+  }, [])
+
+  const parsedSelectedDate = useMemo(() => {
+    return parseDate(selectedDate)
+  }, [selectedDate])
+
+  const [currentDate, setCurrentDate] = useState(() => {
+    return new Date(
+      parsedSelectedDate.getFullYear(),
+      parsedSelectedDate.getMonth(),
+      1
+    )
+  })
+
+  useEffect(() => {
+    setCurrentDate(
+      new Date(
+        parsedSelectedDate.getFullYear(),
+        parsedSelectedDate.getMonth(),
+        1
+      )
+    )
+
+    setCurrentMonth(parsedSelectedDate.getMonth())
+  }, [parsedSelectedDate, setCurrentMonth])
+
+  const selectedFilters = calendarFilters as FilterKey[]
+
+  const demoEvents: EventType[] = [
+    {
+      id: "cal-demo-0",
+      title: "Pre-Season Meetup",
+      date: "2026-04-03",
+      time: "19:00",
+      location: "Main Hall",
+      image: FALLBACK_IMAGE,
+      category: "event",
+      visibility: "public",
+      pricing: "free",
+      price: 0,
+      likes: 12,
+      isSaved: false,
+      comments: [],
+      commentsCount: 0,
+      isDance: true,
+      audienceTags: ["dance", "social", "free", "public"],
+    },
+    {
+      id: "cal-demo-1",
+      title: "New Season Announcement",
+      date: "2026-04-04",
+      time: "12:00",
+      location: "Online",
+      image: FALLBACK_IMAGE,
+      category: "announcement",
+      visibility: "public",
+      pricing: "free",
+      price: 0,
+      likes: 89,
+      isSaved: false,
+      comments: [],
+      commentsCount: 0,
+      audienceTags: ["public"],
+    },
+    {
+      id: "cal-demo-2",
+      title: "Bachata Fundamentals",
+      date: "2026-04-04",
+      time: "18:00",
+      location: "Studio A, Sin Vergüenza HQ",
+      image: FALLBACK_IMAGE,
+      category: "class",
+      visibility: "public",
+      pricing: "free",
+      price: 0,
+      likes: 28,
+      isSaved: false,
+      comments: [],
+      commentsCount: 0,
+      isDance: true,
+      audienceTags: ["dance", "class", "free", "public"],
+    },
+    {
+      id: "cal-demo-3",
+      title: "Salsa Night Showcase",
+      date: "2026-04-04",
+      time: "20:00",
+      location: "Centro Cultural, NYC",
+      image: FALLBACK_IMAGE,
+      category: "event",
+      visibility: "public",
+      pricing: "paid",
+      price: 25,
+      likes: 45,
+      isSaved: false,
+      comments: [],
+      commentsCount: 0,
+      isDance: true,
+      isOffCampus: true,
+      audienceTags: ["dance", "paid", "off-campus", "public", "party"],
+    },
+    {
+      id: "cal-demo-4",
+      title: "Advanced Salsa Techniques",
+      date: "2026-04-05",
+      time: "19:30",
+      location: "Studio B, Sin Vergüenza HQ",
+      image: FALLBACK_IMAGE,
+      category: "class",
+      visibility: "public",
+      pricing: "paid",
+      price: 20,
+      likes: 34,
+      isSaved: true,
+      comments: [],
+      commentsCount: 0,
+      isDance: true,
+      isWorkshop: true,
+      audienceTags: ["dance", "class", "workshop", "paid", "public"],
+    },
+  ]
+  const sourceEvents = events.length > 0 ? events : demoEvents
+  const pinnedEvents = getPinnedEvents()
+  const savedEvents = getSavedEvents()
+
+  const year = currentDate.getFullYear()
+  const month = currentDate.getMonth()
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const firstDayOfMonth = new Date(year, month, 1).getDay()
+
+  const calendarDays = useMemo(() => {
+    const days: (number | null)[] = []
+
+    for (let i = 0; i < firstDayOfMonth; i++) days.push(null)
+    for (let i = 1; i <= daysInMonth; i++) days.push(i)
+
+    return days
+  }, [firstDayOfMonth, daysInMonth])
+
+  const focusDays = useMemo(() => {
+    const base = parseDate(selectedDate)
+    const days: Date[] = []
+
+    for (let i = 0; i < 10; i++) {
+      const next = new Date(base)
+      next.setDate(base.getDate() + i)
+      days.push(next)
+    }
+
+    return days
+  }, [selectedDate])
+
+  useEffect(() => {
+    if (!daysStripRef.current) return
+
+    daysStripRef.current.scrollTo({ left: 0, behavior: "smooth" })
+  }, [selectedDate])
+
+  const prevMonth = () => {
+    const newDate = new Date(year, month - 1, 1)
+
+    setCurrentMonth(newDate.getMonth())
+    setCurrentDate(newDate)
+  }
+
+  const nextMonth = () => {
+    const newDate = new Date(year, month + 1, 1)
+
+    setCurrentMonth(newDate.getMonth())
+    setCurrentDate(newDate)
+  }
+
+  const getEventsOnDay = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(
+      day
+    ).padStart(2, "0")}`
+
+    return sourceEvents.filter((event) => event.date === dateStr)
+  }
+
+  const isSelectedDay = (day: number) => {
+    return (
+      parsedSelectedDate.getDate() === day &&
+      parsedSelectedDate.getMonth() === month &&
+      parsedSelectedDate.getFullYear() === year
+    )
+  }
+
+  const toggleFilter = (filter: FilterKey) => {
+    setQuickScope(null)
+
+    if (selectedFilters.includes(filter)) {
+      setCalendarFilters(selectedFilters.filter((item) => item !== filter))
+    } else {
+      setCalendarFilters([...selectedFilters, filter])
+    }
+  }
+
+  const clearAllFilters = () => {
+    setQuickScope(null)
+    setCalendarFilters([])
+  }
+
+  const matchesFilter = (event: EventType, filter: FilterKey) => {
+    const tags = getEventTags(event)
+
+    switch (filter) {
+      case "public":
+        return getVisibilityLabel(event) === "Public" || tags.includes("public")
+      case "private":
+        return getVisibilityLabel(event) === "Private" || tags.includes("private")
+      case "free":
+        return isEventFree(event) || tags.includes("free")
+      case "paid":
+        return !isEventFree(event) || tags.includes("paid")
+      case "offCampus":
+        return isEventOffCampus(event)
+      case "workshop":
+        return isEventWorkshop(event)
+      case "individual":
+        return (
+          (event.description || "").toLowerCase().includes("individual") ||
+          tags.includes("individual")
+        )
+      case "dance":
+        return isEventDance(event)
+      case "gaming":
+        return tags.includes("gaming")
+      case "sports":
+        return tags.includes("sports")
+      case "social":
+        return tags.includes("social")
+      case "family":
+        return tags.includes("family")
+      case "food":
+        return tags.includes("food")
+      case "networking":
+        return tags.includes("networking")
+      case "party":
+        return tags.includes("party")
+      case "culture":
+        return tags.includes("culture")
+      case "music":
+        return tags.includes("music")
+      case "outdoor":
+        return tags.includes("outdoor")
+      case "class":
+        return event.category === "class" || tags.includes("class")
+      default:
+        return true
+    }
+  }
+
+  const matchesSearch = (event: EventType) => {
+    if (!calendarSearchQuery.trim()) return true
+
+    const q = calendarSearchQuery.toLowerCase()
+
+    return (
+      (event.title || "").toLowerCase().includes(q) ||
+      (event.shortDescription || "").toLowerCase().includes(q) ||
+      (event.description || "").toLowerCase().includes(q) ||
+      (event.location || "").toLowerCase().includes(q) ||
+      String(getEventHost(event)).toLowerCase().includes(q) ||
+      (event.organizer || "").toLowerCase().includes(q)
+    )
+  }
+  const matchesSelectedFilters = (event: EventType) => {
+    if (selectedFilters.length === 0) return true
+
+    return selectedFilters.every((filter) => matchesFilter(event, filter))
+  }
+
+  const baseVisibleEvents = useMemo(() => {
+    return sourceEvents
+      .filter(matchesSearch)
+      .filter(matchesSelectedFilters)
+      .sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1
+        if (!a.isPinned && b.isPinned) return 1
+
+        return getEventTimestamp(a) - getEventTimestamp(b)
+      })
+  }, [sourceEvents, calendarSearchQuery, selectedFilters])
+
+  const selectedDateEvents = useMemo(() => {
+    return baseVisibleEvents
+      .filter((event) => event.date === selectedDate)
+      .sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b))
+  }, [baseVisibleEvents, selectedDate])
+
+  const upcomingEvents = useMemo(() => {
+    return baseVisibleEvents.filter((event) => isFutureEvent(event))
+  }, [baseVisibleEvents])
+
+  const weekRange = useMemo(() => {
+    return getWeekRangeFrom(selectedDate)
+  }, [selectedDate])
+
+  const thisWeekEvents = useMemo(() => {
+    return upcomingEvents.filter((event) =>
+      isDateWithinRange(event.date, weekRange.start, weekRange.end)
+    )
+  }, [upcomingEvents, weekRange])
+
+  const pinnedVisibleEvents = useMemo(() => {
+    const ids = new Set(pinnedEvents.map((event) => event.id))
+
+    return sourceEvents
+      .filter((event) => event.isPinned || ids.has(event.id))
+      .filter(matchesSearch)
+      .filter(matchesSelectedFilters)
+      .sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b))
+      .slice(0, INITIAL_VISIBLE_PINNED)
+  }, [sourceEvents, pinnedEvents, calendarSearchQuery, selectedFilters])
+
+  const savedVisibleEvents = useMemo(() => {
+    const ids = new Set(savedEvents.map((event) => event.id))
+
+    return sourceEvents
+      .filter((event) => event.isSaved || ids.has(event.id))
+      .filter(matchesSearch)
+      .filter(matchesSelectedFilters)
+      .sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b))
+  }, [sourceEvents, savedEvents, calendarSearchQuery, selectedFilters])
+
+  const quickEvents = useMemo(() => {
+    if (quickScope === "today") {
+      return baseVisibleEvents.filter((event) => event.date === getTodayString())
+    }
+
+    if (quickScope === "week") return thisWeekEvents
+    if (quickScope === "saved") return savedVisibleEvents
+    if (quickScope === "pinned") return pinnedVisibleEvents
+
+    return null
+  }, [
+    quickScope,
+    baseVisibleEvents,
+    thisWeekEvents,
+    savedVisibleEvents,
+    pinnedVisibleEvents,
+  ])
+
+  const focusEvents = useMemo(() => {
+    if (quickEvents) return quickEvents
+
+    return selectedDateEvents
+  }, [quickEvents, selectedDateEvents])
+
+  const filteredEvents = useMemo(() => {
+    return selectedDateEvents
+  }, [selectedDateEvents])
+
+  const groupedFocusEvents = useMemo<EventGroup[]>(() => {
+    const today = getTodayString()
+    const tomorrow = getTomorrowString()
+    const groupsMap = new Map<string, EventType[]>()
+
+    focusEvents.forEach((event) => {
+      const key = event.date
+
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, [])
+      }
+
+      groupsMap.get(key)?.push(event)
+    })
+
+    return Array.from(groupsMap.entries())
+      .sort(([a], [b]) => parseDate(a).getTime() - parseDate(b).getTime())
+      .map(([date, groupEvents]) => {
+        let title = formatTinyDate(date)
+
+        if (date === today) title = "Today"
+        if (date === tomorrow) title = "Tomorrow"
+
+        return {
+          key: date,
+          title,
+          subtitle:
+            groupEvents.length === 1
+              ? "1 event ready"
+              : `${groupEvents.length} events ready`,
+          events: groupEvents.sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b)),
+        }
+      })
+  }, [focusEvents])
+  const visibleSelectedDayEvents = useMemo(() => {
+    if (selectedDayExpanded) return selectedDateEvents
+
+    return selectedDateEvents.slice(0, INITIAL_VISIBLE_SELECTED_DAY)
+  }, [selectedDateEvents, selectedDayExpanded])
+
+  const hiddenSelectedDayCount = Math.max(
+    selectedDateEvents.length - INITIAL_VISIBLE_SELECTED_DAY,
+    0
+  )
+
+  const activeQuickChip = (chip: (typeof QUICK_CHIPS)[number]) => {
+    if (chip.filter) return selectedFilters.includes(chip.filter)
+
+    return quickScope === chip.key
+  }
+
+  const handleQuickChip = (chip: (typeof QUICK_CHIPS)[number]) => {
+    if (chip.filter) {
+      setQuickScope(null)
+
+      if (selectedFilters.includes(chip.filter)) {
+        setCalendarFilters(selectedFilters.filter((filter) => filter !== chip.filter))
+      } else {
+        setCalendarFilters([...selectedFilters, chip.filter])
+      }
+
+      return
+    }
+
+    if (quickScope === chip.key) {
+      setQuickScope(null)
+      return
+    }
+
+    setQuickScope(chip.key)
+
+    if (chip.key === "today") {
+      setSelectedDate(getTodayString())
+      setCalendarHighlightedEventId(null)
+    }
+  }
+
+  const handleEventSelect = (event: EventType) => {
+    setOpeningEventId(event.id)
+
+    window.setTimeout(() => {
+      setSelectedEvent(event)
+      setLastEventSource("calendar")
+      setCurrentScreen("event-detail")
+      setOpeningEventId(null)
+    }, 140)
+  }
+
+  const handleDateSelect = (dateString: string) => {
+    setSelectedDate(dateString)
+    setSelectedDayExpanded(false)
+    setQuickScope(null)
+    setCalendarHighlightedEventId(null)
+  }
+
+  const handleMonthDaySelect = (day: number) => {
+    const newDate = new Date(year, month, day)
+
+    handleDateSelect(formatDateString(newDate))
+  }
+
+  const handleModeChange = (mode: CalendarMode) => {
+    setCalendarViewMode(mode)
+    setFiltersOpen(false)
+  }
+
+  const toggleGroupExpanded = (groupKey: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupKey]: !prev[groupKey],
+    }))
+  }
+
+  const selectedDateLabel = formatDateTitle(selectedDate)
+  const savedIndicatorOn = savedEvents.length > 0
+  const pinnedIndicatorOn = pinnedEvents.length > 0
+
+  const visibleList =
+    calendarViewMode === "focus"
+      ? focusEvents
+      : filteredEvents
+
+  const hasAnyVisibleEvents = visibleList.length > 0
+  const activeFilterCount = selectedFilters.length + (quickScope ? 1 : 0)
+
+  const headerSubtitle =
+    calendarViewMode === "focus"
+      ? "Curated moments, dates, and highlights."
+      : "Month view, refined for events."
+
+  return (
+  <div className="relative h-screen overflow-hidden bg-[#0A0A0A] text-white">
+    <div className="absolute inset-x-0 top-0 z-[80]">
+      <TopHeader title="Calendar" />
+    </div>
+
+    <div className="relative h-full overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 z-0">
+          <div className="absolute left-[-120px] top-[-120px] h-[280px] w-[280px] rounded-full bg-[#C9A84C]/[0.045] blur-3xl" />
+          <div className="absolute bottom-[15%] right-[-160px] h-[320px] w-[320px] rounded-full bg-[#C9A84C]/[0.035] blur-3xl" />
+        </div>
+
+<div
+  className="relative z-[1] h-full overflow-y-auto overscroll-contain px-4 pb-[138px] pt-[92px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+  style={{ WebkitOverflowScrolling: "touch" }}
+>
+          <div
+className="shrink-0 border-b border-white/[0.06] bg-[#0A0A0A]/72 pb-3 pt-2 backdrop-blur-2xl"
+            style={{
+              opacity: mounted ? 1 : 0,
+              transform: mounted ? "translateY(0px)" : "translateY(8px)",
+              transition:
+                "opacity 320ms ease, transform 360ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+          >
+            {!calendarSearchOpen ? (
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.28em] text-[#C9A84C]/80">
+                      Event Control Center
+                    </p>
+
+                    <h1 className="font-serif text-[28px] font-semibold tracking-[-0.04em] text-white">
+                      Calendar
+                    </h1>
+
+                    <p className="mt-1 line-clamp-1 text-[12px] text-white/45">
+                      {headerSubtitle}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentScreen("create-event")}
+                    className="mt-1 inline-flex shrink-0 items-center gap-2 rounded-full border border-[#C9A84C]/25 bg-[#C9A84C]/12 px-4 py-2.5 text-[12px] font-medium text-[#F6E7BA] shadow-[0_0_22px_rgba(201,168,76,0.08)] transition-all duration-300 active:scale-[0.97]"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <PremiumToggle
+                    value={calendarViewMode as CalendarMode}
+                    onChange={handleModeChange}
+                  />
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setFiltersOpen((prev) => !prev)}
+                      className={cn(
+                        "flex h-[42px] w-[42px] items-center justify-center rounded-full border backdrop-blur-md transition-all duration-300 active:scale-[0.96]",
+                        activeFilterCount > 0
+                          ? "border-[#C9A84C]/30 bg-[#C9A84C]/12 text-[#F6E7BA]"
+                          : "border-white/10 bg-white/[0.045] text-white/60"
+                      )}
+                    >
+                      <SlidersHorizontal className="h-4 w-4" />
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setFiltersOpen(false)
+                        setCalendarSearchOpen(true)
+                      }}
+                      className="flex h-[42px] w-[42px] items-center justify-center rounded-full border border-white/10 bg-white/[0.045] text-white/60 backdrop-blur-md transition-all duration-300 active:scale-[0.96]"
+                    >
+                      <Search className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                  <HeaderStat
+                    icon={<CalendarIcon className="h-3.5 w-3.5" />}
+                    label={selectedDateLabel}
+                    active
+                  />
+
+                  <HeaderStat
+                    icon={<Bell className="h-3.5 w-3.5" />}
+                    label={`Pinned ${pinnedEvents.length > 0 ? pinnedEvents.length : ""}`}
+                    active={pinnedIndicatorOn}
+                  />
+
+                  <HeaderStat
+                    icon={<Bookmark className="h-3.5 w-3.5" />}
+                    label={`Saved ${savedEvents.length > 0 ? savedEvents.length : ""}`}
+                    active={savedIndicatorOn}
+                  />
+                </div>
+
+                <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                  {QUICK_CHIPS.map((chip) => (
+                    <QuickChip
+                      key={chip.key}
+                      label={chip.label}
+                      active={activeQuickChip(chip)}
+                      onClick={() => handleQuickChip(chip)}
+                    />
+                  ))}
+                </div>
+
+                <div
+                  className={cn(
+                    "grid transition-all duration-300",
+                    filtersOpen
+                      ? "grid-rows-[1fr] opacity-100"
+                      : "grid-rows-[0fr] opacity-0"
+                  )}
+                >
+                  <div className="overflow-hidden">
+                    <div className="rounded-[24px] border border-white/10 bg-[#121212]/92 p-3 shadow-[0_18px_45px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[12px] font-medium text-white">
+                            Refine events
+                          </p>
+
+                          <p className="mt-0.5 text-[11px] text-white/40">
+                            Keep it curated, fast, and clean.
+                          </p>
+                        </div>
+
+                        {selectedFilters.length > 0 && (
+                          <button
+                            onClick={clearAllFilters}
+                            className="rounded-full border border-[#C9A84C]/20 bg-[#C9A84C]/10 px-3 py-1.5 text-[11px] font-medium text-[#F6E7BA] transition-all duration-300 active:scale-[0.97]"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {FILTER_OPTIONS.map((filter) => {
+                          const active = selectedFilters.includes(filter.key)
+
+                          return (
+                            <button
+                              key={filter.key}
+                              onClick={() => toggleFilter(filter.key)}
+                              className={cn(
+                                "rounded-full border px-3 py-2 text-[11px] font-medium transition-all duration-300 active:scale-[0.97]",
+                                active
+                                  ? "border-[#C9A84C]/30 bg-[#C9A84C]/14 text-[#F6E7BA] shadow-[0_0_18px_rgba(201,168,76,0.08)]"
+                                  : "border-white/10 bg-white/[0.04] text-white/60 hover:border-white/15 hover:bg-white/[0.06]"
+                              )}
+                            >
+                              {filter.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setCalendarSearchOpen(false)
+                    setCalendarSearchQuery("")
+                  }}
+                  className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#121212]/95 text-white/65 backdrop-blur-xl transition-all duration-300 active:scale-[0.96]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+
+                  <input
+                    value={calendarSearchQuery}
+                    onChange={(event) => setCalendarSearchQuery(event.target.value)}
+                    placeholder="Search events, hosts, places..."
+                    className="h-[50px] w-full rounded-full border border-white/10 bg-[#121212]/95 pl-11 pr-5 text-[14px] text-white placeholder:text-white/35 outline-none backdrop-blur-xl transition-all duration-300 focus:border-[#C9A84C]/30 focus:bg-[#121212]"
+                  />
+                </div>
+
+                <button
+                  onClick={() => setCurrentScreen("create-event")}
+                  className="h-[50px] shrink-0 rounded-full border border-[#C9A84C]/25 bg-[#C9A84C]/12 px-5 text-[12px] font-medium text-[#F6E7BA] transition-all duration-300 active:scale-[0.97]"
+                >
+                  Create
+                </button>
+              </div>
+            )}
+
+            {calendarViewMode === "focus" ? (
+              <div className="mt-4 space-y-4">
+                <div
+                  ref={daysStripRef}
+                  className="flex snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  {focusDays.map((date) => {
+                    const dateStr = formatDateString(date)
+                    const eventsCount = sourceEvents.filter(
+                      (event) => event.date === dateStr
+                    ).length
+
+                    return (
+                      <FocusDayPill
+                        key={dateStr}
+                        date={date}
+                        selected={selectedDate === dateStr && !quickScope}
+                        eventsCount={eventsCount}
+                        onClick={() => handleDateSelect(dateStr)}
+                      />
+                    )
+                  })}
+                </div>
+
+                {pinnedVisibleEvents.length > 0 && !quickScope && (
+                  <div className="space-y-3">
+                    <SectionTitle
+                      title="Highlights"
+                      subtitle="Pinned moments worth keeping close."
+                    />
+
+                    <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                      {pinnedVisibleEvents.map((event) => (
+                        <PinnedHighlightCard
+                          key={event.id}
+                          event={event}
+                          onOpen={() => handleEventSelect(event)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-serif text-[22px] font-semibold tracking-[-0.03em] text-white">
+                      {quickScope
+                        ? QUICK_CHIPS.find((chip) => chip.key === quickScope)?.label
+                        : "Upcoming Events"}
+                    </h3>
+
+                    <p className="mt-1 text-[12px] text-white/45">
+                      {quickScope
+                        ? `${focusEvents.length} curated result${
+                            focusEvents.length === 1 ? "" : "s"
+                          }`
+                        : selectedDateLabel}
+                    </p>
+                  </div>
+
+                  {activeFilterCount > 0 && (
+                    <button
+                      onClick={() => {
+                        setQuickScope(null)
+                        setCalendarFilters([])
+                      }}
+                      className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-medium text-white/55 transition-all duration-300 active:scale-[0.97]"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-4">
+                <div className="mx-auto w-full max-w-[360px] overflow-hidden rounded-[28px] border border-[#C9A84C]/15 bg-[#121212]/92 p-3 shadow-[0_22px_55px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+                  <div className="mb-3 flex items-center justify-between">
+                    <button
+                      onClick={prevMonth}
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-all duration-300 active:scale-[0.96]"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+
+                    <div className="text-center">
+                      <h3 className="font-serif text-[19px] font-semibold tracking-[-0.03em] text-white">
+                        {MONTH_NAMES[month]} {year}
+                      </h3>
+
+                      <p className="mt-0.5 text-[10px] uppercase tracking-[0.22em] text-[#C9A84C]/65">
+                        Expanded View
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={nextMonth}
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-all duration-300 active:scale-[0.96]"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="mb-1 grid grid-cols-7 gap-1">
+                    {DAY_NAMES.map((day, index) => (
+                      <div
+                        key={`${day}-${index}`}
+                        className="py-1.5 text-center text-[10px] font-medium uppercase tracking-[0.14em] text-white/35"
+                      >
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1">
+                    {calendarDays.map((day, index) => {
+                      if (day === null) {
+                        return <div key={`blank-${index}`} />
+                      }
+
+                      const dayEvents = getEventsOnDay(day)
+
+                      return (
+                        <MonthDayCell
+                          key={`${year}-${month}-${day}`}
+                          day={day}
+                          selected={isSelectedDay(day)}
+                          events={dayEvents}
+                          onClick={() => handleMonthDaySelect(day)}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="rounded-[28px] border border-white/10 bg-[#121212]/88 p-4 shadow-[0_18px_45px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-[#C9A84C]/75">
+                        Selected Day
+                      </p>
+
+                      <h3 className="mt-1 line-clamp-1 font-serif text-[22px] font-semibold tracking-[-0.03em] text-white">
+                        {selectedDateLabel}
+                      </h3>
+
+                      <p className="mt-1 text-[12px] text-white/45">
+                        {selectedDateEvents.length === 1
+                          ? "1 event scheduled"
+                          : `${selectedDateEvents.length} events scheduled`}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => setCalendarViewMode("focus")}
+                      className="shrink-0 rounded-full border border-[#C9A84C]/20 bg-[#C9A84C]/10 px-4 py-2 text-[11px] font-medium text-[#F6E7BA] transition-all duration-300 active:scale-[0.97]"
+                    >
+                      Focus
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="px-0 pt-5">
+            {calendarViewMode === "focus" ? (
+              <div className="space-y-6 pb-4">
+                {!hasAnyVisibleEvents ? (
+                  <EmptyState
+                    title="Nothing scheduled yet"
+                    subtitle="Explore another day, clear filters, or create the next Sin Vergüenza moment."
+                    cta={
+                      <div className="flex flex-wrap justify-center gap-2">
+                        <button
+                          onClick={() => setCurrentScreen("create-event")}
+                          className="rounded-full border border-[#C9A84C]/25 bg-[#C9A84C]/12 px-5 py-2.5 text-[12px] font-medium text-[#F6E7BA] transition-all duration-300 active:scale-[0.97]"
+                        >
+                          Create Event
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setQuickScope(null)
+                            setCalendarFilters([])
+                            setCalendarSearchQuery("")
+                          }}
+                          className="rounded-full border border-white/10 bg-white/[0.045] px-5 py-2.5 text-[12px] font-medium text-white/60 transition-all duration-300 active:scale-[0.97]"
+                        >
+                          Reset View
+                        </button>
+                      </div>
+                    }
+                  />
+                ) : quickScope ? (
+                  <div className="space-y-3">
+                    {focusEvents
+                      .slice(
+                        0,
+                        selectedDayExpanded
+                          ? focusEvents.length
+                          : INITIAL_VISIBLE_SELECTED_DAY
+                      )
+                      .map((event, index) => (
+                        <CompactEventCard
+                          key={event.id}
+                          event={event}
+                          index={index}
+                          mounted={mounted}
+                          isOpening={openingEventId === event.id}
+                          highlighted={calendarHighlightedEventId === event.id}
+                          onOpen={() => handleEventSelect(event)}
+                          onToggleSave={toggleSave}
+                        />
+                      ))}
+
+                    <ViewMoreButton
+                      expanded={selectedDayExpanded}
+                      hiddenCount={Math.max(
+                        focusEvents.length - INITIAL_VISIBLE_SELECTED_DAY,
+                        0
+                      )}
+                      onClick={() => setSelectedDayExpanded((prev) => !prev)}
+                    />
+                  </div>
+                ) : groupedFocusEvents.length > 0 ? (
+                  <div className="space-y-6">
+                    {groupedFocusEvents.map((group) => {
+                      const expanded = expandedGroups[group.key]
+                      const visibleEvents = expanded
+                        ? group.events
+                        : group.events.slice(0, INITIAL_VISIBLE_PER_GROUP)
+
+                      const hiddenCount = Math.max(
+                        group.events.length - INITIAL_VISIBLE_PER_GROUP,
+                        0
+                      )
+
+                      return (
+                        <section key={group.key} className="space-y-3">
+                          <div className="flex items-end justify-between gap-3 px-1">
+                            <div>
+                              <h3 className="font-serif text-[21px] font-semibold tracking-[-0.03em] text-white">
+                                {group.title}
+                              </h3>
+
+                              <p className="mt-1 text-[12px] text-white/42">
+                                {group.subtitle}
+                              </p>
+                            </div>
+
+                            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white/40">
+                              {formatShortDate(group.key)}
+                            </span>
+                          </div>
+
+                          <div className="space-y-3">
+                            {visibleEvents.map((event, index) => (
+                              <CompactEventCard
+                                key={event.id}
+                                event={event}
+                                index={index}
+                                mounted={mounted}
+                                isOpening={openingEventId === event.id}
+                                highlighted={
+                                  calendarHighlightedEventId === event.id
+                                }
+                                onOpen={() => handleEventSelect(event)}
+                                onToggleSave={toggleSave}
+                              />
+                            ))}
+                          </div>
+
+                          <ViewMoreButton
+                            expanded={expanded}
+                            hiddenCount={hiddenCount}
+                            onClick={() => toggleGroupExpanded(group.key)}
+                          />
+                        </section>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {visibleSelectedDayEvents.map((event, index) => (
+                      <CompactEventCard
+                        key={event.id}
+                        event={event}
+                        index={index}
+                        mounted={mounted}
+                        isOpening={openingEventId === event.id}
+                        highlighted={calendarHighlightedEventId === event.id}
+                        onOpen={() => handleEventSelect(event)}
+                        onToggleSave={toggleSave}
+                      />
+                    ))}
+
+                    <ViewMoreButton
+                      expanded={selectedDayExpanded}
+                      hiddenCount={hiddenSelectedDayCount}
+                      onClick={() => setSelectedDayExpanded((prev) => !prev)}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4 pb-4">
+                {filteredEvents.length === 0 ? (
+                  <EmptyState
+                    title="No events here yet"
+                    subtitle="This date is quiet. Try a nearby day, reset filters, or create something worth showing up for."
+                    cta={
+                      <div className="flex flex-wrap justify-center gap-2">
+                        <button
+                          onClick={() => setCurrentScreen("create-event")}
+                          className="rounded-full border border-[#C9A84C]/25 bg-[#C9A84C]/12 px-5 py-2.5 text-[12px] font-medium text-[#F6E7BA] transition-all duration-300 active:scale-[0.97]"
+                        >
+                          Create Event
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setCalendarFilters([])
+                            setCalendarSearchQuery("")
+                            setQuickScope(null)
+                          }}
+                          className="rounded-full border border-white/10 bg-white/[0.045] px-5 py-2.5 text-[12px] font-medium text-white/60 transition-all duration-300 active:scale-[0.97]"
+                        >
+                          Clear Filters
+                        </button>
+                      </div>
+                    }
+                  />
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between gap-3 px-1">
+                      <div>
+                        <h3 className="font-serif text-[21px] font-semibold tracking-[-0.03em] text-white">
+                          Events on this day
+                        </h3>
+
+                        <p className="mt-1 text-[12px] text-white/42">
+                          {filteredEvents.length === 1
+                            ? "1 event ready to view"
+                            : `${filteredEvents.length} events ready to view`}
+                        </p>
+                      </div>
+
+                      {filteredEvents.length >
+                        INITIAL_VISIBLE_SELECTED_DAY && (
+                        <button
+                          onClick={() =>
+                            setSelectedDayExpanded((prev) => !prev)
+                          }
+                          className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-2 text-[11px] font-medium text-white/55 transition-all duration-300 active:scale-[0.97]"
+                        >
+                          {selectedDayExpanded ? "Less" : "More"}
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      {(selectedDayExpanded
+                        ? filteredEvents
+                        : filteredEvents.slice(
+                            0,
+                            INITIAL_VISIBLE_SELECTED_DAY
+                          )
+                      ).map((event, index) => (
+                        <CompactEventCard
+                          key={event.id}
+                          event={event}
+                          index={index}
+                          mounted={mounted}
+                          isOpening={openingEventId === event.id}
+                          highlighted={calendarHighlightedEventId === event.id}
+                          onOpen={() => handleEventSelect(event)}
+                          onToggleSave={toggleSave}
+                        />
+                      ))}
+                    </div>
+
+                    <ViewMoreButton
+                      expanded={selectedDayExpanded}
+                      hiddenCount={Math.max(
+                        filteredEvents.length - INITIAL_VISIBLE_SELECTED_DAY,
+                        0
+                      )}
+                      onClick={() => setSelectedDayExpanded((prev) => !prev)}
+                    />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+          <div className="absolute inset-x-0 bottom-0 z-[80]">
+        <BottomNav />
+      </div>
+    </div>
+  )
+}

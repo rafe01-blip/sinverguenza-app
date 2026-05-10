@@ -1,0 +1,1671 @@
+"use client"
+
+import { useMemo, useRef, useState } from "react"
+import {
+  ShoppingBag,
+  Search,
+  SlidersHorizontal,
+  X,
+  ChevronRight,
+  Sparkles,
+  Heart,
+} from "lucide-react"
+import { useApp, ProductType } from "@/lib/app-context"
+import { TopHeader } from "@/components/navigation/top-header"
+import { BottomNav } from "@/components/navigation/bottom-nav"
+
+const GOLD = "#C9A84C"
+const GOLD_DARK = "#8B6914"
+const DARK = "#0A0A0A"
+const CARD = "#121212"
+
+
+type ShopCategory =
+  | "all"
+  | "tops"
+  | "womens"
+  | "mens"
+  | "accessories"
+  | "auto"
+
+type SortKey = "featured" | "newest" | "price-low" | "price-high"
+
+type ShopColorOption = {
+  id?: string
+  name: string
+  label?: string
+  swatch: string
+  image?: string
+  images?: string[]
+  lifestyleImages?: string[]
+  heroImage?: string
+  featuredImage?: string
+  hoverImage?: string
+  isDefault?: boolean
+}
+
+type ShopProductInput = Omit<ProductType, "colorOptions"> & {
+  heroImage?: string
+  featuredImage?: string
+  hoverImage?: string
+  colorOptions?: ShopColorOption[]
+}
+
+type EnhancedProduct = Omit<ProductType, "colorOptions"> & {
+  category: ShopCategory | string
+  gender?: "male" | "female" | "unisex"
+  compareAtPrice?: number
+  material?: string
+  fit?: string
+  care?: string
+  shippingNote?: string
+  availability?: "in-stock" | "low-stock" | "out-of-stock"
+  featured?: boolean
+  isNew?: boolean
+  isBestSeller?: boolean
+  isLimited?: boolean
+  sortOrder?: number
+  lifestyleImages?: string[]
+  heroImage?: string
+  featuredImage?: string
+  hoverImage?: string
+  colorOptions?: ShopColorOption[]
+}
+
+const CATEGORY_LABELS: { key: ShopCategory; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "tops", label: "Tops" },
+  { key: "womens", label: "Women’s" },
+  { key: "mens", label: "Men’s" },
+  { key: "accessories", label: "Accessories" },
+  { key: "auto", label: "Auto" },
+]
+function uniqueImages(images: (string | undefined | null)[]) {
+  return images
+    .filter((image): image is string => !!image && image.trim().length > 0)
+    .filter((image, index, list) => list.indexOf(image) === index)
+}
+
+/* =========================
+   IMAGE NAME PLAN
+   Las imágenes van en:
+   public/shop/
+========================= */
+
+const HOODIE_BLACK_IMAGES = [
+  "/shop/sv-hoodie-black-main.jpg",
+  "/shop/sv-hoodie-black-back.jpg",
+  "/shop/sv-hoodie-black-detail.jpg",
+  "/shop/sv-hoodie-black-lifestyle-1.jpg",
+  "/shop/sv-hoodie-black-lifestyle-2.jpg",
+]
+
+const HOODIE_BLACK_LIFESTYLE_IMAGES = [
+  "/shop/sv-hoodie-black-lifestyle-1.jpg",
+  "/shop/sv-hoodie-black-lifestyle-2.jpg",
+]
+
+const TEE_BLACK_IMAGES = [
+  "/shop/sv-tee-black-main.jpg",
+  "/shop/sv-tee-black-back.jpg",
+  "/shop/sv-tee-black-detail.jpg",
+  "/shop/sv-tee-black-lifestyle-1.jpg",
+]
+
+const TEE_WHITE_IMAGES = [
+  "/shop/sv-tee-white-main.jpg",
+  "/shop/sv-tee-white-back.jpg",
+  "/shop/sv-tee-white-detail.jpg",
+  "/shop/sv-tee-white-lifestyle-1.jpg",
+]
+
+const SPORTS_BRA_BLACK_IMAGES = [
+  "/shop/sv-sports-bra-black-main.jpg",
+  "/shop/sv-sports-bra-black-back.jpg",
+  "/shop/sv-sports-bra-black-detail.jpg",
+  "/shop/sv-sports-bra-black-lifestyle-1.jpg",
+]
+
+const SPORTS_BRA_BURGUNDY_IMAGES = [
+  "/shop/sv-sports-bra-burgundy-main.jpg",
+  "/shop/sv-sports-bra-burgundy-back.jpg",
+  "/shop/sv-sports-bra-burgundy-detail.jpg",
+  "/shop/sv-sports-bra-burgundy-lifestyle-1.jpg",
+]
+
+const LEGGINGS_BLACK_IMAGES = [
+  "/shop/sv-leggings-black-main.jpg",
+  "/shop/sv-leggings-black-back.jpg",
+  "/shop/sv-leggings-black-detail.jpg",
+  "/shop/sv-leggings-black-lifestyle-1.jpg",
+]
+
+const LEGGINGS_OLIVE_IMAGES = [
+  "/shop/sv-leggings-olive-main.jpg",
+  "/shop/sv-leggings-olive-back.jpg",
+  "/shop/sv-leggings-olive-detail.jpg",
+  "/shop/sv-leggings-olive-lifestyle-1.jpg",
+]
+/* =========================
+   PRODUCTS DATA
+========================= */
+
+const SHOP_PRODUCTS: ShopProductInput[] = [
+  {
+    id: "sv-hoodie-black",
+    name: "SV Signature Hoodie",
+    description: "Premium heavyweight hoodie with embroidered SV logo.",
+    price: 75,
+    category: "tops",
+    image: HOODIE_BLACK_IMAGES[0],
+    images: uniqueImages(HOODIE_BLACK_IMAGES),
+    lifestyleImages: HOODIE_BLACK_LIFESTYLE_IMAGES,
+    heroImage: HOODIE_BLACK_IMAGES[0],
+    featuredImage: HOODIE_BLACK_IMAGES[0],
+    hoverImage: HOODIE_BLACK_IMAGES[1],
+    featured: true,
+    isBestSeller: true,
+    material: "Cotton blend",
+    fit: "Relaxed",
+    availability: "in-stock",
+  },
+  {
+    id: "sv-tee-black",
+    name: "SV Core Tee - Black",
+    description: "Minimal premium tee for everyday wear.",
+    price: 35,
+    category: "mens",
+    image: TEE_BLACK_IMAGES[0],
+    images: uniqueImages(TEE_BLACK_IMAGES),
+    lifestyleImages: [TEE_BLACK_IMAGES[3]],
+    heroImage: TEE_BLACK_IMAGES[0],
+    hoverImage: TEE_BLACK_IMAGES[1],
+    isNew: true,
+    material: "100% cotton",
+    fit: "Regular",
+    availability: "in-stock",
+  },
+  {
+    id: "sv-tee-white",
+    name: "SV Core Tee - White",
+    description: "Clean white essential tee.",
+    price: 35,
+    category: "womens",
+    image: TEE_WHITE_IMAGES[0],
+    images: uniqueImages(TEE_WHITE_IMAGES),
+    lifestyleImages: [TEE_WHITE_IMAGES[3]],
+    heroImage: TEE_WHITE_IMAGES[0],
+    hoverImage: TEE_WHITE_IMAGES[1],
+    material: "100% cotton",
+    fit: "Regular",
+    availability: "in-stock",
+  },
+  {
+    id: "sv-sports-bra-black",
+    name: "SV Sports Bra - Black",
+    description: "Supportive and stylish for movement.",
+    price: 45,
+    category: "womens",
+    image: SPORTS_BRA_BLACK_IMAGES[0],
+    images: uniqueImages(SPORTS_BRA_BLACK_IMAGES),
+    lifestyleImages: [SPORTS_BRA_BLACK_IMAGES[2]],
+    heroImage: SPORTS_BRA_BLACK_IMAGES[3],
+    hoverImage: SPORTS_BRA_BLACK_IMAGES[1],
+    material: "Performance fabric",
+    fit: "Compression",
+    availability: "in-stock",
+  },
+  {
+    id: "sv-sports-bra-burgundy",
+    name: "SV Sports Bra - Burgundy",
+    description: "Rich tone performance bra.",
+    price: 45,
+    category: "womens",
+    image: SPORTS_BRA_BURGUNDY_IMAGES[0],
+    images: uniqueImages(SPORTS_BRA_BURGUNDY_IMAGES),
+    lifestyleImages: [SPORTS_BRA_BURGUNDY_IMAGES[3]],
+    heroImage: SPORTS_BRA_BURGUNDY_IMAGES[1],
+    hoverImage: SPORTS_BRA_BURGUNDY_IMAGES[2],
+    material: "Performance fabric",
+    fit: "Compression",
+    availability: "in-stock",
+  },
+  {
+    id: "sv-leggings-black",
+    name: "SV Sculpt Leggings - Black",
+    description: "High-waist sculpt leggings.",
+    price: 60,
+    category: "womens",
+    image: LEGGINGS_BLACK_IMAGES[0],
+    images: uniqueImages(LEGGINGS_BLACK_IMAGES),
+    lifestyleImages: [LEGGINGS_BLACK_IMAGES[3]],
+    heroImage: LEGGINGS_BLACK_IMAGES[0],
+    hoverImage: LEGGINGS_BLACK_IMAGES[1],
+    material: "Stretch performance",
+    fit: "Slim",
+    availability: "in-stock",
+  },
+  {
+    id: "sv-leggings-olive",
+    name: "SV Sculpt Leggings - Olive",
+    description: "Modern olive performance leggings.",
+    price: 60,
+    category: "womens",
+    image: LEGGINGS_OLIVE_IMAGES[0],
+    images: uniqueImages(LEGGINGS_OLIVE_IMAGES),
+    lifestyleImages: [LEGGINGS_OLIVE_IMAGES[3]],
+    heroImage: LEGGINGS_OLIVE_IMAGES[0],
+    hoverImage: LEGGINGS_OLIVE_IMAGES[1],
+    material: "Stretch performance",
+    fit: "Slim",
+    availability: "in-stock",
+  },
+]
+function normalizeText(value?: string) {
+  return (value || "").trim().toLowerCase()
+}
+
+function toggleValue(list: string[], value: string) {
+  return list.includes(value)
+    ? list.filter((item) => item !== value)
+    : [...list, value]
+}
+
+function inferCategory(product: ProductType): ShopCategory {
+  const raw = normalizeText(product.category)
+  const name = normalizeText(product.name)
+
+  if (raw.includes("women") || raw === "female") return "womens"
+  if (raw.includes("men") || raw === "male") return "mens"
+
+  if (
+    raw.includes("top") ||
+    raw.includes("hoodie") ||
+    raw.includes("tee") ||
+    name.includes("hoodie") ||
+    name.includes("tee") ||
+    name.includes("shirt")
+  ) {
+    return "tops"
+  }
+
+  if (raw.includes("auto") || name.includes("car")) return "auto"
+
+  if (
+    raw.includes("accessor") ||
+    name.includes("cap") ||
+    name.includes("hat") ||
+    name.includes("bag")
+  ) {
+    return "accessories"
+  }
+
+  return "accessories"
+}
+
+function normalizeColorOptions(product: ProductType): ShopColorOption[] {
+  const extended = product as ShopProductInput
+
+  if (extended.colorOptions && extended.colorOptions.length > 0) {
+    return extended.colorOptions.map((option, index) => {
+      const optionImages = uniqueImages([
+        option.image,
+        option.heroImage,
+        option.featuredImage,
+        option.hoverImage,
+        ...(option.images || []),
+        ...(option.lifestyleImages || []),
+      ])
+
+      const fallbackImages = uniqueImages([
+        product.image,
+        product.heroImage,
+        product.featuredImage,
+        product.hoverImage,
+        ...(product.images || []),
+        ...(product.lifestyleImages || []),
+      ])
+
+      const safeImages =
+        optionImages.length > 0
+          ? optionImages
+          : fallbackImages.length > 0
+          ? fallbackImages
+          : ["/placeholder.svg"]
+
+      return {
+        ...option,
+        id: option.id || `${product.id}-color-${index + 1}`,
+        label: option.label || option.name,
+        image: option.image || safeImages[0],
+        images: safeImages,
+        lifestyleImages: option.lifestyleImages || [],
+        heroImage: option.heroImage || option.image || safeImages[0],
+        featuredImage: option.featuredImage || option.image || safeImages[0],
+        hoverImage: option.hoverImage || safeImages[1] || safeImages[0],
+        isDefault: option.isDefault ?? index === 0,
+      }
+    })
+  }
+  const fallbackImages = uniqueImages([
+    product.image,
+    product.heroImage,
+    product.featuredImage,
+    product.hoverImage,
+    ...(product.images || []),
+    ...(product.lifestyleImages || []),
+  ])
+
+  const safeImages =
+    fallbackImages.length > 0 ? fallbackImages : ["/placeholder.svg"]
+
+  const colors =
+    product.colors && product.colors.length > 0 ? product.colors : ["Black/Gold"]
+
+  return colors.map((color, index) => ({
+    id: `${product.id}-color-${index + 1}`,
+    name: color,
+    label: color,
+    swatch:
+      normalizeText(color).includes("white") ||
+      normalizeText(color).includes("cream")
+        ? "#F3F3F3"
+        : normalizeText(color).includes("burgundy")
+        ? "#6E1F2A"
+        : normalizeText(color).includes("olive")
+        ? "#4A5A3A"
+        : "#111111",
+    image: safeImages[0],
+    images: safeImages,
+    lifestyleImages: product.lifestyleImages || [],
+    heroImage: product.heroImage || safeImages[0],
+    featuredImage: product.featuredImage || safeImages[0],
+    hoverImage: product.hoverImage || safeImages[1] || safeImages[0],
+    isDefault: index === 0,
+  }))
+}
+
+function enrichProduct(product: ProductType, index: number): EnhancedProduct {
+  const extended = product as ShopProductInput
+  const category = inferCategory(product)
+  const stock = typeof product.stock === "number" ? product.stock : 12
+
+  const availability: EnhancedProduct["availability"] =
+    stock <= 0 ? "out-of-stock" : stock <= 8 ? "low-stock" : "in-stock"
+
+  const colorOptions = normalizeColorOptions(product)
+  const defaultColor =
+    colorOptions.find((option) => option.isDefault) || colorOptions[0]
+
+    const safeImages =
+    product.images && product.images.length > 0
+      ? product.images
+      : defaultColor?.images && defaultColor.images.length > 0
+      ? defaultColor.images
+      : uniqueImages([
+          product.image,
+          extended.heroImage,
+          extended.featuredImage,
+          extended.hoverImage,
+          defaultColor?.image,
+          defaultColor?.heroImage,
+        ])
+
+  const finalImages = safeImages.length > 0 ? safeImages : ["/placeholder.svg"]
+  return {
+    ...product,
+    image: product.image || defaultColor?.image || finalImages[0],
+    images: finalImages,
+    category,
+    stock,
+    availability,
+    colorOptions,
+    lifestyleImages: uniqueImages([
+      ...(defaultColor?.lifestyleImages || []),
+      ...(product.lifestyleImages || []),
+    ]),
+        heroImage: extended.heroImage || finalImages[0],
+    featuredImage: extended.featuredImage || finalImages[0],
+    hoverImage: extended.hoverImage || finalImages[1] || finalImages[0],
+    shortDescription:
+      product.shortDescription ||
+      product.description?.slice(0, 90) ||
+      "Premium Sin Vergüenza piece with elevated black-and-gold identity.",
+    compareAtPrice:
+      product.compareAtPrice ??
+      (product.price >= 50 ? Number((product.price * 1.18).toFixed(0)) : undefined),
+    material: product.material || "Premium signature finish",
+    fit: product.fit || "True to size",
+    care: product.care || "Machine wash cold",
+    shippingNote: product.shippingNote || "Ships in 2–4 business days",
+    featured:
+      product.featured ??
+      product.isBestSeller ??
+      product.isNew ??
+      index < 3,
+    isBestSeller: product.isBestSeller ?? product.badge === "Best Seller",
+    isNew: product.isNew ?? product.badge === "New",
+    isLimited: product.isLimited ?? product.badge === "Limited",
+    sortOrder: product.sortOrder ?? index + 1,
+    gender:
+      category === "mens"
+        ? "male"
+        : category === "womens"
+        ? "female"
+        : "unisex",
+  }
+}
+
+function getBadgeLabel(product: EnhancedProduct) {
+  if (product.badge) return product.badge
+  if (product.isBestSeller) return "Best Seller"
+  if (product.isNew) return "New"
+  if (product.isLimited) return "Limited"
+  return ""
+}
+
+function getAvailabilityLabel(product: EnhancedProduct) {
+  if (product.availability === "out-of-stock") return "Out of Stock"
+  if (product.availability === "low-stock") return "Low Stock"
+  return "In Stock"
+}
+
+function getProductCardImage(product: EnhancedProduct) {
+  return (
+    product.image ||
+    product.featuredImage ||
+    product.images?.[0] ||
+    product.hoverImage ||
+    "/placeholder.svg"
+  )
+}
+
+function getProductFeaturedImage(product: EnhancedProduct) {
+  return (
+    product.featuredImage ||
+    product.image ||
+    product.images?.[0] ||
+    "/placeholder.svg"
+  )
+}
+function getSwatchBorder(swatch?: string) {
+  const value = normalizeText(swatch)
+
+  if (
+    value === "#ffffff" ||
+    value === "#fff" ||
+    value === "#f5f5f5" ||
+    value === "#f3f3f3" ||
+    value === "#ededed" ||
+    value === "#e7e0d4"
+  ) {
+    return "1px solid rgba(255,255,255,0.18)"
+  }
+
+  return "1px solid rgba(255,255,255,0.08)"
+}
+
+function ShopHero({ onShopNow }: { onShopNow: () => void }) {
+  return (
+    <div style={heroWrap}>
+      <div style={heroOverlay} />
+      <div style={heroGlow} />
+
+      <div style={heroContent}>
+        <div style={heroEyebrow}>SIN VERGÜENZA COLLECTION</div>
+
+        <div style={heroTitle}>Premium Dancewear & Lifestyle</div>
+
+        <div style={heroText}>
+          Elevated black-and-gold essentials built for dance, campus life,
+          rehearsals, and community moments.
+        </div>
+
+        <button onClick={onShopNow} style={heroBtn}>
+          Shop Now
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function Badge({ label }: { label: string }) {
+  if (!label) return null
+  return <div style={badgeStyle}>{label}</div>
+}
+
+function ProductCard({
+  product,
+  isFavorite,
+  onToggleFavorite,
+  onOpen,
+  onQuickAdd,
+}: {
+  product: EnhancedProduct
+  isFavorite: boolean
+  onToggleFavorite: () => void
+  onOpen: () => void
+  onQuickAdd: () => void
+}) {
+  const badge = getBadgeLabel(product)
+  const outOfStock = product.availability === "out-of-stock"
+  const previewImage = getProductCardImage(product)
+
+  return (
+    <div style={productCard}>
+      <div onClick={onOpen} style={imageHitArea}>
+        <img src={previewImage} alt={product.name} style={productImage} />
+        <div style={imageOverlay} />
+
+        {badge ? <Badge label={badge} /> : null}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleFavorite()
+          }}
+          style={favoriteBtn}
+        >
+          <Heart
+            size={17}
+            fill={isFavorite ? GOLD : "transparent"}
+            color={isFavorite ? GOLD : "#fff"}
+          />
+        </button>
+
+        <div style={tapToViewWrap}>
+          <span style={tapToViewText}>Tap to View</span>
+        </div>
+      </div>
+
+      <div style={cardBody}>
+        <div style={productName}>{product.name}</div>
+        <div style={productDesc}>{product.shortDescription}</div>
+
+        <div style={metaRow}>
+          <div style={priceWrap}>
+            <div style={priceText}>${product.price}</div>
+
+            {product.compareAtPrice ? (
+              <div style={compareAtText}>${product.compareAtPrice}</div>
+            ) : null}
+          </div>
+
+          <div style={stockText}>{getAvailabilityLabel(product)}</div>
+        </div>
+
+        <div style={sizesLine}>
+          {product.sizes?.length ? `${product.sizes.length} sizes` : "One size"}
+        </div>
+
+        {product.colorOptions && product.colorOptions.length > 0 ? (
+          <div style={swatchesRow}>
+            {product.colorOptions.slice(0, 4).map((color) => (
+              <div
+                key={color.id || color.name}
+                title={color.label || color.name}
+                style={{
+                  ...swatchDot,
+                  background: color.swatch,
+                  border: getSwatchBorder(color.swatch),
+                }}
+              />
+            ))}
+          </div>
+        ) : null}
+
+        <button
+          onClick={onQuickAdd}
+          disabled={outOfStock}
+          style={{
+            ...addCartBtn,
+            opacity: outOfStock ? 0.45 : 1,
+            cursor: outOfStock ? "not-allowed" : "pointer",
+          }}
+        >
+          <ShoppingBag size={15} />
+          <span>{outOfStock ? "Unavailable" : "Add to Cart"}</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+export function ShopScreen() {
+  const { products, setSelectedProduct, setCurrentScreen, addToCart, cartItems } =
+    useApp()
+
+  const collectionRef = useRef<HTMLDivElement | null>(null)
+
+  const [activeCategory, setActiveCategory] = useState<ShopCategory>("all")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [sortBy, setSortBy] = useState<SortKey>("featured")
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([])
+  const [selectedColors, setSelectedColors] = useState<string[]>([])
+  const [priceFilter, setPriceFilter] = useState<
+    "all" | "under-25" | "25-50" | "over-50"
+  >("all")
+  const [availabilityFilter, setAvailabilityFilter] = useState<
+    "all" | "in-stock" | "low-stock" | "out-of-stock"
+  >("all")
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({})
+
+  const sourceProducts = useMemo<EnhancedProduct[]>(() => {
+    if (products.length > 0) {
+      return products.map((product, index) => enrichProduct(product, index))
+    }
+
+    return SHOP_PRODUCTS.map((product, index) =>
+      enrichProduct(product as unknown as ProductType, index)
+    )
+  }, [products])
+
+  const categoryProducts = useMemo(() => {
+    if (activeCategory === "all") return sourceProducts
+    return sourceProducts.filter((product) => product.category === activeCategory)
+  }, [activeCategory, sourceProducts])
+
+  const allSizes = useMemo(() => {
+    return [...new Set(sourceProducts.flatMap((product) => product.sizes || []))].slice(
+      0,
+      12
+    )
+  }, [sourceProducts])
+
+  const allColors = useMemo(() => {
+    const fromColors = sourceProducts.flatMap((product) => product.colors || [])
+    const fromColorOptions = sourceProducts.flatMap((product) =>
+      (product.colorOptions || []).map((option) => option.name)
+    )
+
+    return [...new Set([...fromColors, ...fromColorOptions])].slice(0, 12)
+  }, [sourceProducts])
+  const filteredProducts = useMemo(() => {
+    let result = [...categoryProducts]
+
+    if (searchQuery.trim()) {
+      const q = normalizeText(searchQuery)
+
+      result = result.filter((product) =>
+        normalizeText(
+          [
+            product.name,
+            product.shortDescription,
+            product.description,
+            product.category,
+            ...(product.colors || []),
+            ...((product.colorOptions || []).map((item) => item.name) || []),
+          ].join(" ")
+        ).includes(q)
+      )
+    }
+
+    if (selectedSizes.length > 0) {
+      result = result.filter((product) => {
+        const productSizes = (product.sizes || []).map((size) => normalizeText(size))
+        return selectedSizes.some((size) =>
+          productSizes.includes(normalizeText(size))
+        )
+      })
+    }
+
+    if (selectedColors.length > 0) {
+      result = result.filter((product) => {
+        const productColors = [
+          ...(product.colors || []),
+          ...((product.colorOptions || []).map((item) => item.name) || []),
+        ].map((color) => normalizeText(color))
+
+        return selectedColors.some((color) =>
+          productColors.includes(normalizeText(color))
+        )
+      })
+    }
+
+    if (priceFilter !== "all") {
+      result = result.filter((product) => {
+        if (priceFilter === "under-25") return product.price < 25
+        if (priceFilter === "25-50") return product.price >= 25 && product.price <= 50
+        if (priceFilter === "over-50") return product.price > 50
+        return true
+      })
+    }
+
+    if (availabilityFilter !== "all") {
+      result = result.filter(
+        (product) =>
+          normalizeText(product.availability) === normalizeText(availabilityFilter)
+      )
+    }
+
+    switch (sortBy) {
+      case "price-low":
+        result.sort((a, b) => a.price - b.price)
+        break
+
+      case "price-high":
+        result.sort((a, b) => b.price - a.price)
+        break
+
+      case "newest":
+        result.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
+        break
+
+      case "featured":
+      default:
+        result.sort((a, b) => {
+          const aScore =
+            (a.featured ? 3 : 0) +
+            (a.isBestSeller ? 2 : 0) +
+            (a.isNew ? 1 : 0) +
+            (a.isLimited ? 1 : 0)
+
+          const bScore =
+            (b.featured ? 3 : 0) +
+            (b.isBestSeller ? 2 : 0) +
+            (b.isNew ? 1 : 0) +
+            (b.isLimited ? 1 : 0)
+
+          if (bScore !== aScore) return bScore - aScore
+          return (a.sortOrder ?? 999) - (b.sortOrder ?? 999)
+        })
+        break
+    }
+
+    return result
+  }, [
+    categoryProducts,
+    searchQuery,
+    selectedSizes,
+    selectedColors,
+    priceFilter,
+    availabilityFilter,
+    sortBy,
+  ])
+  const featuredProducts = useMemo(() => {
+    return sourceProducts.filter((product) => product.featured).slice(0, 6)
+  }, [sourceProducts])
+
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+
+  const openProduct = (product: EnhancedProduct) => {
+    setSelectedProduct(product as unknown as ProductType)
+    setCurrentScreen("product-detail")
+  }
+
+  const quickAddToCart = (product: EnhancedProduct) => {
+    const size = product.sizes?.[0] || "One Size"
+    const color = product.colorOptions?.[0]?.name || product.colors?.[0] || "Default"
+
+    addToCart({
+      product: product as unknown as ProductType,
+      size,
+      color,
+      quantity: 1,
+    })
+  }
+
+  const toggleFavorite = (productId: string) => {
+    setFavorites((prev) => ({
+      ...prev,
+      [productId]: !prev[productId],
+    }))
+  }
+
+  const clearFilters = () => {
+    setSelectedSizes([])
+    setSelectedColors([])
+    setPriceFilter("all")
+    setAvailabilityFilter("all")
+    setSearchQuery("")
+    setSortBy("featured")
+  }
+
+  const activeFilterCount =
+    selectedSizes.length +
+    selectedColors.length +
+    (priceFilter !== "all" ? 1 : 0) +
+    (availabilityFilter !== "all" ? 1 : 0) +
+    (searchQuery.trim() ? 1 : 0)
+
+  return (
+<div className="flex h-screen flex-col overflow-hidden bg-background text-white">
+  <TopHeader title="Shop" />
+
+<main className="flex-1 overflow-y-auto pb-28">
+    
+
+      <div style={{ padding: "16px" }}>
+        <ShopHero
+          onShopNow={() =>
+            collectionRef.current?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            })
+          }
+        />
+
+        <div style={toolbarWrap}>
+          <div style={searchWrap}>
+            <Search size={18} color="#a7a7a7" />
+
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search merch"
+              style={searchInput}
+            />
+
+            {searchQuery ? (
+              <button onClick={() => setSearchQuery("")} style={clearSearchBtn}>
+                <X size={15} />
+              </button>
+            ) : null}
+          </div>
+
+          <button onClick={() => setCurrentScreen("cart")} style={cartPillBtn}>
+            <ShoppingBag size={16} />
+            <span>Cart</span>
+            {cartCount > 0 ? <span style={cartCountBubble}>{cartCount}</span> : null}
+          </button>
+        </div>
+        <div style={controlsRow}>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((prev) => !prev)}
+            style={filtersOpen || activeFilterCount > 0 ? chipActiveWide : chipWide}
+          >
+            <SlidersHorizontal size={16} />
+            <span>Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}</span>
+          </button>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortKey)}
+            style={sortSelect}
+          >
+            <option value="featured">Featured</option>
+            <option value="newest">Newest</option>
+            <option value="price-low">Price low to high</option>
+            <option value="price-high">Price high to low</option>
+          </select>
+        </div>
+
+        {filtersOpen ? (
+          <div style={filtersPanel}>
+            <div style={filterGroup}>
+              <div style={filterTitle}>Size</div>
+
+              <div style={rowWrap}>
+                {allSizes.map((size) => {
+                  const active = selectedSizes.includes(size)
+
+                  return (
+                    <button
+                      key={size}
+                      onClick={() =>
+                        setSelectedSizes((prev) => toggleValue(prev, size))
+                      }
+                      style={active ? chipActiveSmall : chipSmall}
+                    >
+                      {size}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div style={filterGroup}>
+              <div style={filterTitle}>Color</div>
+
+              <div style={rowWrap}>
+                {allColors.map((color) => {
+                  const active = selectedColors.includes(color)
+
+                  return (
+                    <button
+                      key={color}
+                      onClick={() =>
+                        setSelectedColors((prev) => toggleValue(prev, color))
+                      }
+                      style={active ? chipActiveSmall : chipSmall}
+                    >
+                      {color}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div style={filterGroup}>
+              <div style={filterTitle}>Price</div>
+
+              <div style={rowWrap}>
+                {[
+                  { key: "all", label: "All" },
+                  { key: "under-25", label: "Under $25" },
+                  { key: "25-50", label: "$25–$50" },
+                  { key: "over-50", label: "Over $50" },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setPriceFilter(item.key as typeof priceFilter)}
+                    style={priceFilter === item.key ? chipActiveSmall : chipSmall}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={filterGroup}>
+              <div style={filterTitle}>Availability</div>
+
+              <div style={rowWrap}>
+                {[
+                  { key: "all", label: "All" },
+                  { key: "in-stock", label: "In Stock" },
+                  { key: "low-stock", label: "Low Stock" },
+                  { key: "out-of-stock", label: "Out of Stock" },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() =>
+                      setAvailabilityFilter(item.key as typeof availabilityFilter)
+                    }
+                    style={availabilityFilter === item.key ? chipActiveSmall : chipSmall}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={clearFilters} style={clearFiltersBtn}>
+              Clear Filters
+            </button>
+          </div>
+        ) : null}
+
+        <div style={shopEyebrow}>Merch Shop</div>
+
+        <div style={categoriesScroll}>
+          {CATEGORY_LABELS.map((category) => (
+            <button
+              key={category.key}
+              onClick={() => setActiveCategory(category.key)}
+              style={activeCategory === category.key ? categoryChipActive : categoryChip}
+            >
+              {category.label}
+            </button>
+          ))}
+        </div>
+        {featuredProducts.length > 0 ? (
+          <div style={{ marginBottom: 24 }}>
+            <div style={sectionHeading}>
+              <span>Featured</span>
+              <div style={sectionHint}>
+                Curated picks <Sparkles size={14} />
+              </div>
+            </div>
+
+            <div style={featuredScroll}>
+              {featuredProducts.map((product) => (
+                <button
+                  key={product.id}
+                  onClick={() => openProduct(product)}
+                  style={featuredCard}
+                >
+                  <div style={featuredImageWrap}>
+                    <img
+                      src={getProductFeaturedImage(product)}
+                      alt={product.name}
+                      style={featuredImage}
+                    />
+                    <div style={featuredOverlay} />
+                    {getBadgeLabel(product) ? (
+                      <Badge label={getBadgeLabel(product)} />
+                    ) : null}
+                  </div>
+
+                  <div style={featuredBody}>
+                    <div style={featuredName}>{product.name}</div>
+                    <div style={featuredDesc}>{product.shortDescription}</div>
+
+                    <div style={featuredBottom}>
+                      <span style={featuredPrice}>${product.price}</span>
+                      <span style={featuredArrow}>
+                        View <ChevronRight size={14} />
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div ref={collectionRef}>
+          <div style={sectionHeading}>
+            <span>Collection</span>
+            <div style={sectionCount}>{filteredProducts.length} items</div>
+          </div>
+
+          {filteredProducts.length === 0 ? (
+            <div style={emptyWrap}>
+              <div style={emptyIcon}>✦</div>
+              <div style={emptyTitle}>No products found</div>
+              <div style={emptyText}>
+                Try another category, search term, or filter combination.
+              </div>
+
+              <button onClick={clearFilters} style={goShopBtn}>
+                Reset Filters
+              </button>
+            </div>
+          ) : (
+            <div style={productGrid}>
+              {filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  isFavorite={!!favorites[product.id]}
+                  onToggleFavorite={() => toggleFavorite(product.id)}
+                  onOpen={() => openProduct(product)}
+                  onQuickAdd={() => quickAddToCart(product)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+</main>
+      <BottomNav />
+    </div>
+  )
+}
+
+/* =========================
+   STYLES
+========================= */
+
+const shopEyebrow = {
+  color: GOLD,
+  fontSize: 14,
+  fontWeight: 900,
+  letterSpacing: 3,
+  textTransform: "uppercase" as const,
+  marginBottom: 14,
+}
+
+const heroWrap = {
+  position: "relative" as const,
+  overflow: "hidden",
+  borderRadius: 28,
+  minHeight: 280,
+  marginBottom: 18,
+  border: "1px solid rgba(201,168,76,0.14)",
+  background:
+    "radial-gradient(circle at top left, rgba(201,168,76,0.22), transparent 32%), linear-gradient(135deg, #080808 0%, #111111 48%, #0a0a0a 100%)",
+}
+
+const heroOverlay = {
+  position: "absolute" as const,
+  inset: 0,
+  background:
+    "linear-gradient(110deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.0) 38%, rgba(201,168,76,0.06) 100%)",
+}
+
+const heroGlow = {
+  position: "absolute" as const,
+  right: -20,
+  top: -20,
+  width: 220,
+  height: 220,
+  borderRadius: "50%",
+  background: "radial-gradient(circle, rgba(201,168,76,0.18), transparent 65%)",
+  filter: "blur(8px)",
+}
+
+const heroContent = {
+  position: "relative" as const,
+  zIndex: 2,
+  padding: "26px 22px 28px",
+  maxWidth: 360,
+}
+
+const heroEyebrow = {
+  color: GOLD,
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: 3,
+  textTransform: "uppercase" as const,
+  marginBottom: 10,
+}
+
+const heroTitle = {
+  fontSize: 31,
+  fontWeight: 900,
+  lineHeight: 1.02,
+  letterSpacing: -0.6,
+  marginBottom: 12,
+}
+
+const heroText = {
+  color: "#d7d7d7",
+  fontSize: 14,
+  lineHeight: 1.55,
+  marginBottom: 18,
+  maxWidth: 300,
+}
+
+const heroBtn = {
+  padding: "12px 18px",
+  borderRadius: 999,
+  border: "none",
+  background: `linear-gradient(135deg,${GOLD},${GOLD_DARK})`,
+  color: "#000",
+  fontWeight: 900,
+  fontSize: 14,
+  cursor: "pointer",
+}
+
+const toolbarWrap = {
+  display: "grid",
+  gridTemplateColumns: "1fr auto",
+  gap: 10,
+  marginBottom: 12,
+}
+
+const searchWrap = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  borderRadius: 16,
+  padding: "13px 14px",
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+}
+
+const searchInput = {
+  flex: 1,
+  background: "transparent",
+  border: "none",
+  outline: "none",
+  color: "#fff",
+  fontSize: 14,
+}
+
+const clearSearchBtn = {
+  width: 26,
+  height: 26,
+  borderRadius: "50%",
+  border: "none",
+  background: "rgba(255,255,255,0.06)",
+  color: "#fff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+}
+
+const cartPillBtn = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "0 14px",
+  borderRadius: 16,
+  border: "1px solid rgba(255,255,255,0.08)",
+  background: CARD,
+  color: "#fff",
+  fontWeight: 800,
+  cursor: "pointer",
+}
+
+const cartCountBubble = {
+  minWidth: 20,
+  height: 20,
+  padding: "0 6px",
+  borderRadius: 999,
+  background: `linear-gradient(135deg,${GOLD},${GOLD_DARK})`,
+  color: "#000",
+  fontSize: 11,
+  fontWeight: 900,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+}
+
+const controlsRow = {
+  display: "grid",
+  gridTemplateColumns: "1fr 170px",
+  gap: 10,
+  marginBottom: 14,
+}
+
+const chipWide = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "transparent",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: 800,
+}
+
+const chipActiveWide = {
+  ...chipWide,
+  border: "1px solid rgba(201,168,76,0.45)",
+  background: "rgba(201,168,76,0.12)",
+  color: GOLD,
+}
+
+const sortSelect = {
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: CARD,
+  color: "#fff",
+  outline: "none",
+  cursor: "pointer",
+}
+
+const filtersPanel = {
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 22,
+  padding: "14px",
+  marginBottom: 18,
+}
+
+const filterGroup = { marginBottom: 14 }
+
+const filterTitle = {
+  fontSize: 13,
+  fontWeight: 900,
+  color: GOLD,
+  letterSpacing: 1,
+  textTransform: "uppercase" as const,
+  marginBottom: 8,
+}
+
+const rowWrap = {
+  display: "flex",
+  flexWrap: "wrap" as const,
+  gap: 10,
+}
+
+const clearFiltersBtn = {
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "1px solid rgba(201,168,76,0.30)",
+  background: "transparent",
+  color: GOLD,
+  fontWeight: 900,
+  cursor: "pointer",
+}
+
+const categoriesScroll = {
+  display: "flex",
+  gap: 10,
+  overflowX: "auto" as const,
+  paddingBottom: 8,
+  marginBottom: 20,
+  scrollbarWidth: "none" as const,
+}
+
+const categoryChip = {
+  padding: "12px 16px",
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "transparent",
+  color: "#fff",
+  cursor: "pointer",
+  whiteSpace: "nowrap" as const,
+  fontWeight: 800,
+}
+
+const categoryChipActive = {
+  ...categoryChip,
+  border: "1px solid rgba(201,168,76,0.45)",
+  background: "rgba(201,168,76,0.12)",
+  color: GOLD,
+}
+
+const chipSmall = {
+  padding: "9px 12px",
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "transparent",
+  color: "#fff",
+  cursor: "pointer",
+  whiteSpace: "nowrap" as const,
+  fontSize: 13,
+}
+
+const chipActiveSmall = {
+  ...chipSmall,
+  border: "1px solid rgba(201,168,76,0.45)",
+  background: "rgba(201,168,76,0.12)",
+  color: GOLD,
+}
+
+const sectionHeading = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 12,
+  fontSize: 22,
+  fontWeight: 900,
+}
+
+const sectionHint = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  color: GOLD,
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: 1,
+  textTransform: "uppercase" as const,
+}
+
+const sectionCount = {
+  color: "#a9a9a9",
+  fontSize: 13,
+  fontWeight: 700,
+}
+
+const featuredScroll = {
+  display: "flex",
+  gap: 14,
+  overflowX: "auto" as const,
+  paddingBottom: 6,
+  marginBottom: 24,
+  scrollbarWidth: "none" as const,
+}
+
+const featuredCard = {
+  minWidth: 255,
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 24,
+  overflow: "hidden",
+  color: "#fff",
+  cursor: "pointer",
+  textAlign: "left" as const,
+}
+
+const featuredImageWrap = {
+  position: "relative" as const,
+  height: 225,
+  overflow: "hidden",
+  background: "#050505",
+}
+
+const featuredImage = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain" as const,
+  objectPosition: "center center",
+  display: "block",
+  background: "#050505",
+}
+
+const featuredOverlay = {
+  position: "absolute" as const,
+  inset: 0,
+  background: "linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.24) 100%)",
+}
+
+const featuredBody = { padding: "14px 14px 16px" }
+
+const featuredName = {
+  fontSize: 20,
+  fontWeight: 900,
+  marginBottom: 8,
+  lineHeight: 1.1,
+}
+
+const featuredDesc = {
+  color: "#b9b9b9",
+  fontSize: 13,
+  lineHeight: 1.5,
+  minHeight: 40,
+  marginBottom: 12,
+}
+
+const featuredBottom = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+}
+
+const featuredPrice = {
+  color: GOLD,
+  fontSize: 24,
+  fontWeight: 900,
+}
+
+const featuredArrow = {
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  color: "#ddd",
+  fontSize: 13,
+  fontWeight: 800,
+}
+
+const productGrid = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 14,
+}
+
+const productCard = {
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 22,
+  overflow: "hidden",
+  boxShadow: "0 10px 24px rgba(0,0,0,0.22)",
+}
+
+const imageHitArea = {
+  position: "relative" as const,
+  height: 210,
+  overflow: "hidden",
+  cursor: "pointer",
+  background: "#050505",
+}
+
+const productImage = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain" as const,
+  objectPosition: "center center",
+  display: "block",
+  background: "#050505",
+}
+
+const imageOverlay = {
+  position: "absolute" as const,
+  inset: 0,
+  background: "linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.30) 100%)",
+}
+
+const badgeStyle = {
+  position: "absolute" as const,
+  top: 10,
+  left: 10,
+  padding: "6px 10px",
+  borderRadius: 999,
+  background: "rgba(201,168,76,0.92)",
+  color: "#000",
+  fontSize: 11,
+  fontWeight: 900,
+  zIndex: 2,
+}
+
+const favoriteBtn = {
+  position: "absolute" as const,
+  top: 10,
+  right: 10,
+  width: 34,
+  height: 34,
+  borderRadius: "50%",
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(15,15,15,0.82)",
+  color: "#fff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  zIndex: 2,
+}
+
+const tapToViewWrap = {
+  position: "absolute" as const,
+  left: 10,
+  right: 10,
+  bottom: 10,
+  display: "flex",
+  justifyContent: "center",
+}
+
+const tapToViewText = {
+  padding: "7px 12px",
+  borderRadius: 999,
+  background: "rgba(201,168,76,0.94)",
+  color: "#000",
+  fontWeight: 900,
+  fontSize: 11,
+  letterSpacing: 0.4,
+}
+
+const cardBody = { padding: "12px 12px 14px" }
+
+const productName = {
+  fontSize: 17,
+  fontWeight: 900,
+  lineHeight: 1.15,
+  marginBottom: 8,
+  minHeight: 40,
+}
+
+const productDesc = {
+  color: "#a9a9a9",
+  fontSize: 12,
+  lineHeight: 1.45,
+  minHeight: 36,
+  marginBottom: 10,
+}
+
+const metaRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 10,
+  marginBottom: 8,
+}
+
+const priceWrap = {
+  display: "flex",
+  alignItems: "baseline",
+  gap: 6,
+  flexWrap: "wrap" as const,
+}
+
+const priceText = {
+  color: GOLD,
+  fontWeight: 900,
+  fontSize: 18,
+}
+
+const compareAtText = {
+  color: "#777",
+  fontSize: 12,
+  textDecoration: "line-through",
+}
+
+const stockText = {
+  color: "#8f8f8f",
+  fontSize: 11,
+  textAlign: "right" as const,
+}
+
+const sizesLine = {
+  color: "#868686",
+  fontSize: 11,
+  marginBottom: 10,
+}
+
+const swatchesRow = {
+  display: "flex",
+  alignItems: "center",
+  gap: 7,
+  marginBottom: 12,
+  minHeight: 14,
+}
+
+const swatchDot = {
+  width: 12,
+  height: 12,
+  borderRadius: "50%",
+  flexShrink: 0 as const,
+}
+
+const addCartBtn = {
+  width: "100%",
+  padding: "11px 12px",
+  borderRadius: 14,
+  border: "none",
+  background: `linear-gradient(135deg,${GOLD},${GOLD_DARK})`,
+  color: "#000",
+  fontWeight: 900,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 7,
+}
+
+const emptyWrap = {
+  marginTop: 10,
+  textAlign: "center" as const,
+  background: CARD,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 24,
+  padding: "34px 20px",
+}
+
+const emptyIcon = {
+  fontSize: 30,
+  marginBottom: 10,
+  color: GOLD,
+}
+
+const emptyTitle = {
+  fontSize: 22,
+  fontWeight: 900,
+  marginBottom: 8,
+}
+
+const emptyText = {
+  color: "#b8b8b8",
+  fontSize: 14,
+  lineHeight: 1.5,
+  marginBottom: 18,
+}
+
+const goShopBtn = {
+  padding: "13px 18px",
+  borderRadius: 14,
+  border: "none",
+  background: `linear-gradient(135deg,${GOLD},${GOLD_DARK})`,
+  color: "#000",
+  fontWeight: 900,
+  cursor: "pointer",
+}
